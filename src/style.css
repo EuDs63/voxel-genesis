@@ -1,0 +1,139 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 20% 20%, #101728, #05070e 55%, #030408);
+  color: #d2dbf2;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 330px 1fr;
+  width: 100%;
+  height: 100%;
+}
+
+.panel {
+  border-right: 1px solid rgba(88, 114, 167, 0.35);
+  padding: 14px;
+  background: linear-gradient(180deg, rgba(5, 10, 20, 0.95), rgba(5, 8, 14, 0.86));
+  overflow-y: auto;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.subtitle {
+  margin: 0.3rem 0 1rem;
+  color: #86a5c7;
+  font-size: 0.9rem;
+}
+
+.row,
+label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.55rem 0;
+  font-size: 0.9rem;
+}
+
+label {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+input[type='range'],
+input[type='text'],
+select,
+button {
+  width: 100%;
+}
+
+button,
+select,
+input[type='text'] {
+  background: rgba(10, 18, 34, 0.9);
+  border: 1px solid rgba(108, 157, 222, 0.35);
+  color: #d2dbf2;
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+input[type='range'] {
+  accent-color: #47cfff;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: rgba(134, 207, 255, 0.8);
+}
+
+.buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.stats {
+  justify-content: space-between;
+  border: 1px solid rgba(89, 112, 151, 0.35);
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+}
+
+small {
+  color: #8fbad8;
+}
+
+.viewport-wrap {
+  position: relative;
+}
+
+#viewport {
+  width: 100%;
+  height: 100%;
+}
+
+.hint {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  max-width: 360px;
+  border: 1px solid rgba(128, 178, 246, 0.5);
+  background: rgba(8, 14, 26, 0.92);
+  border-radius: 12px;
+  padding: 0.8rem;
+  box-shadow: 0 0 28px rgba(81, 164, 224, 0.18);
+}
+
+.hidden {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .panel {
+    border-right: 0;
+    border-bottom: 1px solid rgba(88, 114, 167, 0.35);
+  }
+}
