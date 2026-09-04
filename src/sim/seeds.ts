@@ -21,16 +21,16 @@ function center(grid: Grid3D): [number, number, number] {
   return [c, c, c];
 }
 
-/** Dense glowing core — the first spark. */
+/** Hollow pulsing kernel with sparse shell. */
 function genesisSpark(grid: Grid3D): void {
   const [cx, cy, cz] = center(grid);
-  const r = Math.max(2, Math.floor(grid.size * 0.16));
+  const r = Math.max(2, Math.floor(grid.size * 0.15));
   for (let z = -r; z <= r; z++) {
     for (let y = -r; y <= r; y++) {
       for (let x = -r; x <= r; x++) {
         const d = Math.sqrt(x * x + y * y + z * z);
-        if (d <= r * 0.85) setAge(grid, cx + x, cy + y, cz + z, 1);
-        else if (d <= r && (x + y + z) % 2 === 0) setAge(grid, cx + x, cy + y, cz + z, 1);
+        if (d <= r * 0.55) setAge(grid, cx + x, cy + y, cz + z, 1);
+        else if (d <= r && (x + y + z) % 3 === 0) setAge(grid, cx + x, cy + y, cz + z, 1);
       }
     }
   }
@@ -74,13 +74,14 @@ function spiralHelix(grid: Grid3D): void {
   }
 }
 
-/** Classic 3D plus / axis cross. */
+/** Sparse axial lattice. */
 function crossOfAges(grid: Grid3D): void {
   const [cx, cy, cz] = center(grid);
   const arm = Math.max(4, Math.floor(grid.size * 0.28));
-  const thick = Math.max(1, Math.floor(grid.size * 0.04));
+  const thick = Math.max(1, Math.floor(grid.size * 0.03));
   for (let i = -arm; i <= arm; i++) {
     for (let t = -thick; t <= thick; t++) {
+      if ((i + t) % 2 !== 0) continue;
       setAge(grid, cx + i, cy + t, cz, 1);
       setAge(grid, cx + t, cy + i, cz, 1);
       setAge(grid, cx, cy + t, cz + i, 1);
@@ -106,7 +107,7 @@ function emberRing(grid: Grid3D): void {
   }
 }
 
-/** Vertical cascading pillar with terraced platforms. */
+/** Sparse pillar with intermittent terraces. */
 function cascadePillar(grid: Grid3D): void {
   const [cx, , cz] = center(grid);
   const h = Math.floor(grid.size * 0.75);
@@ -117,15 +118,16 @@ function cascadePillar(grid: Grid3D): void {
     const r = Math.max(1, 2 + (tier % 3));
     for (let z = -r; z <= r; z++) {
       for (let x = -r; x <= r; x++) {
-        if (x * x + z * z <= r * r + 0.5) {
+        if (x * x + z * z <= r * r + 0.5 && (x + z + i) % 2 === 0) {
           setAge(grid, cx + x, y, cz + z, 1);
         }
       }
     }
     // occasional wing
-    if (i % 5 === 0) {
+    if (i % 6 === 0) {
       const wing = r + 2;
       for (let w = -wing; w <= wing; w++) {
+        if (w % 2 !== 0) continue;
         setAge(grid, cx + w, y, cz, 1);
         setAge(grid, cx, y, cz + w, 1);
       }
@@ -136,38 +138,38 @@ function cascadePillar(grid: Grid3D): void {
 export const SEEDS: readonly SeedDefinition[] = [
   {
     id: 'genesis-spark',
-    name: 'Genesis Spark',
-    description: 'A dense ember core — the first light in the void',
+    name: 'Pulse Kernel',
+    description: 'A hollow ember kernel that breathes from the inside out',
     apply: genesisSpark,
   },
   {
     id: 'twin-stars',
-    name: 'Twin Stars',
-    description: 'Two spheres destined to dance and collide',
+    name: 'Binary Hearts',
+    description: 'Two offset cores that orbit and exchange fragments',
     apply: twinStars,
   },
   {
     id: 'spiral-helix',
-    name: 'Spiral Helix',
-    description: 'A double helix climbing through empty space',
+    name: 'Helix Prayer',
+    description: 'A double filament climbing through the void',
     apply: spiralHelix,
   },
   {
     id: 'cross-of-ages',
-    name: 'Cross of Ages',
-    description: 'An axial cross of living matter',
+    name: 'Axis Reliquary',
+    description: 'Sparse axial relic lines with crystalline symmetry',
     apply: crossOfAges,
   },
   {
     id: 'ember-ring',
-    name: 'Ember Ring',
-    description: 'A toroidal ring of fire',
+    name: 'Cinder Halo',
+    description: 'A toroidal ember halo with open pockets',
     apply: emberRing,
   },
   {
     id: 'cascade-pillar',
-    name: 'Cascade Pillar',
-    description: 'Terraced pillar rising from the abyss',
+    name: 'Terrace Spire',
+    description: 'A sparse tiered spire rising through dark space',
     apply: cascadePillar,
   },
 ] as const;

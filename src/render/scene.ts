@@ -13,6 +13,13 @@ export interface SceneOptions {
   reducedMotion: boolean;
 }
 
+export type CameraPresetId = 'orbit' | 'hero' | 'top-down' | 'close-up' | 'flyby';
+
+interface CameraPreset {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+}
+
 export class GenesisScene {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene: THREE.Scene;
@@ -25,6 +32,13 @@ export class GenesisScene {
   autoOrbit = true;
   private reducedMotion: boolean;
   private boundsHelper: THREE.LineSegments | null = null;
+  private worldSize = 24;
+  private cameraLerpFromPosition = new THREE.Vector3();
+  private cameraLerpFromTarget = new THREE.Vector3();
+  private cameraLerpToPosition = new THREE.Vector3();
+  private cameraLerpToTarget = new THREE.Vector3();
+  private cameraLerpT = 1;
+  private cameraLerpDuration = 0.75;
 
   constructor(canvas: HTMLCanvasElement, opts: SceneOptions) {
     this.reducedMotion = opts.reducedMotion;
@@ -117,7 +131,24 @@ export class GenesisScene {
     this.controls.autoRotate = this.autoOrbit;
   }
 
+  applyCameraPreset(presetId: CameraPresetId, smooth = true): void {
+    const preset = this.cameraPreset(presetId);
+    if (!smooth || this.reducedMotion) {
+      this.camera.position.copy(preset.position);
+      this.controls.target.copy(preset.target);
+      this.controls.update();
+      this.cameraLerpT = 1;
+      return;
+    }
+    this.cameraLerpFromPosition.copy(this.camera.position);
+    this.cameraLerpFromTarget.copy(this.controls.target);
+    this.cameraLerpToPosition.copy(preset.position);
+    this.cameraLerpToTarget.copy(preset.target);
+    this.cameraLerpT = 0;
+  }
+
   updateBounds(size: number): void {
+    this.worldSize = size;
     if (this.boundsHelper) {
       this.root.remove(this.boundsHelper);
       this.boundsHelper.geometry.dispose();
@@ -139,7 +170,8 @@ export class GenesisScene {
     }
   }
 
-  render(): void {
+  render(dt = 1 / 60): void {
+    this.updateCameraLerp(dt);
     this.controls.update();
     if (this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.camera);
@@ -163,6 +195,54 @@ export class GenesisScene {
     window.removeEventListener('resize', this.onResize);
     this.controls.dispose();
     this.renderer.dispose();
+  }
+
+  private cameraPreset(id: CameraPresetId): CameraPreset {
+    const size = this.worldSize;
+    const far = size * 1.85;
+    const mid = size * 1.2;
+    const near = size * 0.78;
+    if (id === 'orbit') {
+      return {
+        position: new THREE.Vector3(far * 0.75, far * 0.6, far * 0.95),
+        target: new THREE.Vector3(0, 0, 0),
+      };
+    }
+    if (id === 'hero') {
+      return {
+        position: new THREE.Vector3(mid * 0.95, mid * 0.42, mid * 0.26),
+        target: new THREE.Vector3(0, 0, 0),
+      };
+    }
+    if (id === 'top-down') {
+      return {
+        position: new THREE.Vector3(0.001, far * 1.08, 0.001),
+        target: new THREE.Vector3(0, 0, 0),
+      };
+    }
+    if (id === 'close-up') {
+      return {
+        position: new THREE.Vector3(near * 0.95, near * 0.25, near * 0.62),
+        target: new THREE.Vector3(0, 0, 0),
+      };
+    }
+    return {
+      position: new THREE.Vector3(-far * 1.08, mid * 0.24, far * 0.45),
+      target: new THREE.Vector3(0, 0, 0),
+    };
+  }
+
+  private updateCameraLerp(dt: number): void {
+    if (this.cameraLerpT >= 1) return;
+    this.cameraLerpT = Math.min(1, this.cameraLerpT + dt / this.cameraLerpDuration);
+    const t = this.easeInOutCubic(this.cameraLerpT);
+    this.camera.position.lerpVectors(this.cameraLerpFromPosition, this.cameraLerpToPosition, t);
+    this.controls.target.lerpVectors(this.cameraLerpFromTarget, this.cameraLerpToTarget, t);
+  }
+
+  private easeInOutCubic(t: number): number {
+    if (t < 0.5) return 4 * t * t * t;
+    return 1 - ((-2 * t + 2) ** 3) / 2;
   }
 }
 

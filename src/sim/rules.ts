@@ -23,44 +23,44 @@ export interface RulePreset {
 /** Named presets chosen for interesting 3D Moore dynamics (not Conway 2333). */
 export const RULE_PRESETS: readonly RulePreset[] = [
   {
-    id: 'ember-bloom',
-    name: 'Ember Bloom',
-    notation: 'B4-6/S5-7',
-    description: 'Organic ember clusters that breathe and branch',
+    id: 'void-breather',
+    name: 'Void Breather',
+    notation: 'B5/S4-5',
+    description: 'Breathing pockets that pulse instead of saturating the volume',
   },
   {
-    id: 'crystal-veins',
-    name: 'Crystal Veins',
-    notation: 'B5-6/S4-6',
-    description: 'Angular crystalline growth along lattice veins',
+    id: 'crystal-choir',
+    name: 'Crystal Choir',
+    notation: 'B6-7/S5-6',
+    description: 'Faceted crystal fans that branch along mirror-like seams',
   },
   {
-    id: 'nebula-drift',
-    name: 'Nebula Drift',
-    notation: 'B13/S13',
-    description: 'Soft volumetric clouds that slowly morph',
+    id: 'starlace-sparse',
+    name: 'Starlace Sparse',
+    notation: 'B4/S3-4,6',
+    description: 'Sparse lacework with drifting sparks and long-lived gaps',
   },
   {
-    id: 'coral-reef',
-    name: 'Coral Reef',
-    notation: 'B6/S5-8,10',
-    description: 'Dense reef structures with stable cores',
+    id: 'tidal-bloom',
+    name: 'Tidal Bloom',
+    notation: 'B5-6/S5,7',
+    description: 'Wave-like growth that alternates between bloom and retreat',
   },
   {
-    id: 'pyroclastic',
-    name: 'Pyroclastic',
-    notation: 'B4-7/S6-8',
-    description: 'Explosive growth settling into rocky forms',
+    id: 'frost-filigree',
+    name: 'Frost Filigree',
+    notation: 'B7/S5-7',
+    description: 'Slow crystalline frost fingers with brittle edges',
   },
   {
-    id: 'amoeba',
-    name: 'Amoeba',
-    notation: 'B9/S5-7,12-13',
-    description: 'Blob-like amoebas that crawl and merge',
+    id: 'ash-drift',
+    name: 'Ash Drift',
+    notation: 'B4-5/S4',
+    description: 'Sparse embers that drift, split, and fade',
   },
 ] as const;
 
-export const DEFAULT_RULE_ID = 'ember-bloom';
+export const DEFAULT_RULE_ID = 'void-breather';
 
 /**
  * Parse a count list like "4-6", "5-8,10", "13", "0-26".
