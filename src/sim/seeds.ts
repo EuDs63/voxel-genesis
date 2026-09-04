@@ -1,5 +1,5 @@
 /**
- * Handcrafted evocative seeds — not just noise.
+ * Handcrafted evocative seeds — sparse, sculptural, not noise blobs.
  */
 
 import { Grid3D } from './grid';
@@ -21,26 +21,25 @@ function center(grid: Grid3D): [number, number, number] {
   return [c, c, c];
 }
 
-/** Dense glowing core — the first spark. */
+/** Compact glowing core — the first spark (kept small so rules can breathe). */
 function genesisSpark(grid: Grid3D): void {
   const [cx, cy, cz] = center(grid);
-  const r = Math.max(2, Math.floor(grid.size * 0.16));
+  const r = Math.max(1, Math.floor(grid.size * 0.08));
   for (let z = -r; z <= r; z++) {
     for (let y = -r; y <= r; y++) {
       for (let x = -r; x <= r; x++) {
         const d = Math.sqrt(x * x + y * y + z * z);
-        if (d <= r * 0.85) setAge(grid, cx + x, cy + y, cz + z, 1);
-        else if (d <= r && (x + y + z) % 2 === 0) setAge(grid, cx + x, cy + y, cz + z, 1);
+        if (d <= r * 0.9) setAge(grid, cx + x, cy + y, cz + z, 1);
       }
     }
   }
 }
 
-/** Two offset spheres orbiting the void. */
+/** Two offset spheres destined to dance. */
 function twinStars(grid: Grid3D): void {
   const [cx, cy, cz] = center(grid);
-  const offset = Math.max(3, Math.floor(grid.size * 0.18));
-  const r = Math.max(2, Math.floor(grid.size * 0.1));
+  const offset = Math.max(3, Math.floor(grid.size * 0.2));
+  const r = Math.max(1, Math.floor(grid.size * 0.07));
   for (const ox of [-offset, offset]) {
     for (let z = -r; z <= r; z++) {
       for (let y = -r; y <= r; y++) {
@@ -57,10 +56,10 @@ function twinStars(grid: Grid3D): void {
 /** DNA-like double helix along Y. */
 function spiralHelix(grid: Grid3D): void {
   const [cx, , cz] = center(grid);
-  const height = Math.floor(grid.size * 0.7);
+  const height = Math.floor(grid.size * 0.65);
   const y0 = Math.floor((grid.size - height) / 2);
   const radius = Math.max(2, Math.floor(grid.size * 0.14));
-  const turns = 2.5;
+  const turns = 2.2;
   for (let i = 0; i < height; i++) {
     const t = (i / height) * turns * Math.PI * 2;
     const y = y0 + i;
@@ -69,66 +68,82 @@ function spiralHelix(grid: Grid3D): void {
       const z = Math.round(cz + Math.sin(t + phase) * radius);
       setAge(grid, x, y, z, 1);
       setAge(grid, x + 1, y, z, 1);
-      setAge(grid, x, y, z + 1, 1);
     }
   }
 }
 
-/** Classic 3D plus / axis cross. */
-function crossOfAges(grid: Grid3D): void {
+/** Octahedral crystal seed — sharp diamond for Crystal Veins. */
+function crystalSeed(grid: Grid3D): void {
   const [cx, cy, cz] = center(grid);
-  const arm = Math.max(4, Math.floor(grid.size * 0.28));
-  const thick = Math.max(1, Math.floor(grid.size * 0.04));
-  for (let i = -arm; i <= arm; i++) {
-    for (let t = -thick; t <= thick; t++) {
-      setAge(grid, cx + i, cy + t, cz, 1);
-      setAge(grid, cx + t, cy + i, cz, 1);
-      setAge(grid, cx, cy + t, cz + i, 1);
-      setAge(grid, cx + t, cy, cz + i, 1);
-      setAge(grid, cx, cy + i, cz + t, 1);
+  const r = Math.max(2, Math.floor(grid.size * 0.14));
+  for (let z = -r; z <= r; z++) {
+    for (let y = -r; y <= r; y++) {
+      for (let x = -r; x <= r; x++) {
+        if (Math.abs(x) + Math.abs(y) + Math.abs(z) === r) {
+          setAge(grid, cx + x, cy + y, cz + z, 1);
+        }
+      }
     }
   }
+  // tiny core
+  setAge(grid, cx, cy, cz, 1);
 }
 
 /** Toroidal ember ring in the XZ plane. */
 function emberRing(grid: Grid3D): void {
   const [cx, cy, cz] = center(grid);
-  const R = Math.max(4, Math.floor(grid.size * 0.28));
-  const tube = Math.max(1, Math.floor(grid.size * 0.06));
+  const R = Math.max(3, Math.floor(grid.size * 0.26));
+  const tube = Math.max(1, Math.floor(grid.size * 0.04));
   for (let z = -R - tube; z <= R + tube; z++) {
-    for (let y = -tube - 1; y <= tube + 1; y++) {
+    for (let y = -tube; y <= tube; y++) {
       for (let x = -R - tube; x <= R + tube; x++) {
         const dist = Math.sqrt(x * x + z * z);
         const d = Math.sqrt((dist - R) ** 2 + y * y);
-        if (d <= tube + 0.4) setAge(grid, cx + x, cy + y, cz + z, 1);
+        if (d <= tube + 0.35) setAge(grid, cx + x, cy + y, cz + z, 1);
       }
     }
   }
 }
 
-/** Vertical cascading pillar with terraced platforms. */
-function cascadePillar(grid: Grid3D): void {
-  const [cx, , cz] = center(grid);
-  const h = Math.floor(grid.size * 0.75);
-  const y0 = Math.floor((grid.size - h) / 2);
-  for (let i = 0; i < h; i++) {
-    const y = y0 + i;
-    const tier = Math.floor(i / Math.max(3, Math.floor(h / 5)));
-    const r = Math.max(1, 2 + (tier % 3));
-    for (let z = -r; z <= r; z++) {
-      for (let x = -r; x <= r; x++) {
-        if (x * x + z * z <= r * r + 0.5) {
-          setAge(grid, cx + x, y, cz + z, 1);
-        }
-      }
+/** Sparse radial mandala — eight spokes + rings. */
+function voidMandala(grid: Grid3D): void {
+  const [cx, cy, cz] = center(grid);
+  const maxR = Math.max(4, Math.floor(grid.size * 0.32));
+  for (let r = 2; r <= maxR; r += 2) {
+    for (let a = 0; a < 8; a++) {
+      const t = (a / 8) * Math.PI * 2;
+      const x = Math.round(cx + Math.cos(t) * r);
+      const z = Math.round(cz + Math.sin(t) * r);
+      setAge(grid, x, cy, z, 1);
+      setAge(grid, x, cy + 1, z, 1);
     }
-    // occasional wing
-    if (i % 5 === 0) {
-      const wing = r + 2;
-      for (let w = -wing; w <= wing; w++) {
-        setAge(grid, cx + w, y, cz, 1);
-        setAge(grid, cx, y, cz + w, 1);
-      }
+  }
+  // vertical axis accent
+  const h = Math.floor(maxR * 0.6);
+  for (let y = -h; y <= h; y++) {
+    if (y % 2 === 0) setAge(grid, cx, cy + y, cz, 1);
+  }
+}
+
+/** Open lattice cage — good for breathing rules. */
+function breathingLattice(grid: Grid3D): void {
+  const [cx, cy, cz] = center(grid);
+  const half = Math.max(3, Math.floor(grid.size * 0.22));
+  const step = Math.max(2, Math.floor(half / 2));
+  for (let y = -half; y <= half; y += step) {
+    for (let x = -half; x <= half; x += step) {
+      setAge(grid, cx + x, cy + y, cz - half, 1);
+      setAge(grid, cx + x, cy + y, cz + half, 1);
+    }
+    for (let z = -half; z <= half; z += step) {
+      setAge(grid, cx - half, cy + y, cz + z, 1);
+      setAge(grid, cx + half, cy + y, cz + z, 1);
+    }
+  }
+  for (let z = -half; z <= half; z += step) {
+    for (let x = -half; x <= half; x += step) {
+      setAge(grid, cx + x, cy - half, cz + z, 1);
+      setAge(grid, cx + x, cy + half, cz + z, 1);
     }
   }
 }
@@ -137,7 +152,7 @@ export const SEEDS: readonly SeedDefinition[] = [
   {
     id: 'genesis-spark',
     name: 'Genesis Spark',
-    description: 'A dense ember core — the first light in the void',
+    description: 'A compact ember core — the first light in the void',
     apply: genesisSpark,
   },
   {
@@ -153,22 +168,28 @@ export const SEEDS: readonly SeedDefinition[] = [
     apply: spiralHelix,
   },
   {
-    id: 'cross-of-ages',
-    name: 'Cross of Ages',
-    description: 'An axial cross of living matter',
-    apply: crossOfAges,
+    id: 'crystal-seed',
+    name: 'Crystal Seed',
+    description: 'An octahedral diamond — sharp edges for lattice growth',
+    apply: crystalSeed,
   },
   {
     id: 'ember-ring',
     name: 'Ember Ring',
-    description: 'A toroidal ring of fire',
+    description: 'A slender toroidal ring of fire',
     apply: emberRing,
   },
   {
-    id: 'cascade-pillar',
-    name: 'Cascade Pillar',
-    description: 'Terraced pillar rising from the abyss',
-    apply: cascadePillar,
+    id: 'void-mandala',
+    name: 'Void Mandala',
+    description: 'Radial spokes and rings — ritual geometry in the dark',
+    apply: voidMandala,
+  },
+  {
+    id: 'breathing-lattice',
+    name: 'Breathing Lattice',
+    description: 'An open cage that expands and contracts under Ember Breath',
+    apply: breathingLattice,
   },
 ] as const;
 
