@@ -1,66 +1,61 @@
 # Voxel Genesis
 
-Voxel Genesis is a cinematic, immediately playable browser-based 3D cellular automaton (3D Game of Life style) built with **TypeScript + Vite + Three.js**.
+Cinematic browser 3D cellular automaton.
 
-## Run
+Ember and cyan living cells in a dark void. Bloom, fog, age-colored voxels.
 
-```bash
-npm install
-npm run dev
-```
+Stack: TypeScript + Vite + Three.js (WebGL). Vitest for simulation tests. No backend, no API keys.
 
-## Build
+## How to run
 
-```bash
-npm run build
-```
+Install dependencies, then start the Vite development server (port 5173).
+Run the test suite with Vitest. Create a production build, then serve it with Vite preview (port 4173).
 
-## Test
-
-```bash
-npm run test
-```
+Scripts in package.json: dev, build, test, preview.
 
 ## Controls
 
-- **Camera**: drag to orbit, right-drag to pan, wheel to zoom
-- **Simulation**: play/pause, step, reset, randomize
-- **Simulation tuning**: speed, size, density
-- **Rules**: choose named 3D B/S presets or enter custom `B.../S...` notation
-- **Seeds**: stamp handcrafted seed presets
-- **Painting**: choose paint/erase and click on the active glowing **Z slice** plane
-- **State sharing**:
-  - URL hash auto-updates with current state
-  - Copy JSON / Load JSON for explicit export/import
+Space play/pause. N step. R reset. G randomize.
+P toggle paint plane. Bracket keys move plane. X Y Z set axis.
+Click the slice to paint; Shift-click to erase.
+O auto-orbit. T time trails. Question-mark toggles the side panel.
+Share via Copy URL (hash state) or JSON export/import.
 
-## Included rule presets
+First-run hint dismisses via localStorage.
+When prefers-reduced-motion is set, bloom and auto-orbit stay off.
 
-- **Nebula Bloom** `B6/S5,6,7`
-- **Crystal Drift** `B5/S4,5`
-- **Pulse Lattice** `B7/S6,7,8`
-- **Aether Weave** `B6,7/S5,6,7,8`
+## Rules
 
-## Visual direction
+Real 26-neighbor Moore CA. Not Conway 2333.
+Default preset: Ember Bloom, notation B4-6/S5-7.
+Other presets: Crystal Veins B5-6/S4-6, Nebula Drift B13/S13,
+Coral Reef B6/S5-8,10, Pyroclastic B4-7/S6-8, Amoeba B9/S5-7,12-13.
+Custom B/S editor included. Boundary modes: clamp or wrap.
 
-- Dark void scene with fog, ember/cyan age-based cell coloration, and tasteful glow
-- Smooth birth/death transitions using display interpolation
-- Surprise feature: fading recent-generation ghost trails for dead cells
-- Optional cinematic auto-orbit (disabled when `prefers-reduced-motion` is detected)
-- First-run hint overlay that dismisses and stays out of the way
+## Seeds
+
+Handcrafted: Genesis Spark, Twin Stars, Spiral Helix,
+Cross of Ages, Ember Ring, Cascade Pillar.
+
+## Surprise feature
+
+Time-trail ghosts: fading translucent voxels of recent generations.
 
 ## Architecture
 
-- `src/sim/grid.ts`: bounded 3D automaton state and deterministic stepping with full 26-neighbor Moore counts
-- `src/sim/rules.ts`: B/S parsing + preset definitions
-- `src/sim/seeds.ts`: handcrafted seed definitions and centered stamping
-- `src/render/voxelScene.ts`: Three.js scene + **InstancedMesh** rendering + slice picking
-- `src/state.ts`: URL-hash and JSON serialization helpers
-- `src/main.ts`: app wiring, UI controls, loop orchestration
+src/sim — grid, neighbors, rules, CA step, seeds, share (unit-tested)
+src/render — InstancedMesh voxels, trails, slice plane, bloom/fog
+src/app.ts — orchestration and HUD bindings
+tests/ — neighbor count, wrap/clamp, rule parse, deterministic step
 
-Simulation and rendering are separated: simulation evolves in typed arrays; renderer consumes display/age/ghost buffers.
+One InstancedMesh for all live cells. Age maps ember to cyan.
 
-## Performance notes
+## Performance
 
-- Live cells and ghost trails render via `InstancedMesh` (not thousands of individual `Mesh` objects)
-- Default grid is `24³` (13,824 cells), iterated in tight typed-array loops
-- Rendering updates instance transforms/colors each frame while stepping occurs at configurable fixed-rate speed
+Default grid 24 cubed. Size control 12 to 40.
+If slow, reduce grid size rather than breaking the renderer.
+Bloom is the costliest effect; trails are optional.
+
+## License
+
+MIT. Built for Eric Edward.
