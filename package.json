@@ -1,21 +1,23 @@
 {
   "name": "voxel-genesis",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview",
-    "test": "vitest run"
-  },
-  "devDependencies": {
-    "@types/three": "^0.185.4",
-    "typescript": "~6.0.2",
-    "vite": "^8.2.2",
-    "vitest": "^5.0.0"
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "three": "^0.185.1"
+    "three": "^0.185.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.0",
+    "jsdom": "^25.0.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0",
+    "vitest": "^2.1.9"
   }
 }
