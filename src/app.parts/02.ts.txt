@@ -1,0 +1,210 @@
+    if (!this.scene.applyCameraPreset(id)) return;
+    document.querySelectorAll('.cam-preset').forEach((b) => {
+      b.classList.toggle('active', (b as HTMLElement).dataset.preset === id);
+    });
+    const on = this.scene.autoOrbit;
+    document.getElementById('btn-orbit')?.classList.toggle('on', on);
+    this.toast(t(cameraKey(id)));
+  }
+  public setInteractionMode(mode: InteractionMode): void {
+    this.interactionMode = mode;
+    this.applyInteractionMode();
+    if (mode === 'paint' && !this.slice.visible) {
+      this.slice.setVisible(true);
+      const btn = document.getElementById('btn-slice-toggle');
+      if (btn) btn.textContent = t('btn.hide');
+    }
+    this.toast(mode === 'paint' ? t('toast.paintMode') : t('toast.orbitMode'));
+  }
+  public applyInteractionMode(): void {
+    const paint = this.interactionMode === 'paint';
+    document.getElementById('btn-mode-orbit')?.classList.toggle('active', !paint);
+    document.getElementById('btn-mode-paint')?.classList.toggle('active', paint);
+    const fab = document.getElementById('btn-mode-fab');
+    if (fab) {
+      fab.textContent = paint ? 'P' : 'O';
+      fab.title = paint ? t('mode.fabPaint') : t('mode.fabOrbit');
+      fab.classList.toggle('paint-on', paint);
+    }
+    document.getElementById('c')?.classList.toggle('mode-paint', paint);
+    document.getElementById('c')?.classList.toggle('mode-orbit', !paint);
+    document.body.classList.toggle('interaction-paint', paint);
+    if (!this.painting) {
+      this.scene.controls.enabled = !paint || !window.matchMedia('(pointer: coarse)').matches;
+      if (!window.matchMedia('(pointer: coarse)').matches) {
+        this.scene.controls.enabled = true;
+        this.scene.controls.mouseButtons.LEFT = paint
+          ? THREE.MOUSE.ROTATE
+          : THREE.MOUSE.ROTATE;
+      }
+    }
+  }
+  private bindInput(canvas: HTMLCanvasElement): void { bindAppInput(this as unknown as AppHost, canvas); }
+  public updatePointer(e: PointerEvent, canvas: HTMLCanvasElement): void {
+    const rect = canvas.getBoundingClientRect();
+    this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+  public paintAt(x: number, y: number, z: number): void {
+    const key = `${x},${y},${z},${this.paintErase ? 0 : 1},${this.brushRadius},${this.symmetry}`;
+    if (key === this.lastPaintKey) return;
+    this.lastPaintKey = key;
+    const brush = brushCellsOnSlice(x, y, z, this.grid.size, this.slice.axis, this.brushRadius);
+    const alive = !this.paintErase;
+    for (const b of brush) {
+      const mirrored = expandSymmetry(b.x, b.y, b.z, this.grid.size, this.symmetry);
+      for (const c of mirrored) {
+        if (alive) {
+          if (!this.grid.isAlive(c.x, c.y, c.z)) this.grid.set(c.x, c.y, c.z, 1);
+        } else if (this.grid.isAlive(c.x, c.y, c.z)) {
+          this.grid.set(c.x, c.y, c.z, 0);
+        }
+      }
+    }
+    this.voxels.sync(this.grid);
+    this.syncStats();
+    this.updatePaintCoordHud(x, y, z);
+  }
+  public updatePaintCoordHud(x: number, y: number, z: number): void {
+    const el = document.getElementById('paint-coord');
+    if (el) el.textContent = `${x}, ${y}, ${z}`;
+  }
+  public clickAxis(axis: SliceAxis): void {
+    document.getElementById(`axis-${axis}`)?.click();
+  }
+  public toggleSlice(): void {
+    const v = !this.slice.visible;
+    this.slice.setVisible(v);
+    const btn = document.getElementById('btn-slice-toggle');
+    if (btn) btn.textContent = v ? t('btn.hide') : t('btn.show');
+    if (!v) this.slice.clearHover();
+  }
+  public nudgeSlice(d: number): void {
+    this.slice.nudge(d);
+    const el = document.getElementById('slice') as HTMLInputElement;
+    el.value = String(this.slice.index);
+    document.getElementById('slice-val')!.textContent = String(this.slice.index);
+  }
+  public togglePlay(): void {
+    this.playing = !this.playing;
+    const btn = document.getElementById('btn-play')!;
+    btn.textContent = this.playing ? t('btn.pause') : t('btn.play');
+  }
+  public doStep(): void {
+    stepInPlace(this.grid, this.scratch, this.rule, this.boundary);
+    this.generation++;
+    if (this.trailsEnabled) this.trails.push(this.grid);
+    this.voxels.sync(this.grid);
+    this.syncStats();
+  }
+  public reset(): void {
+    this.playing = false;
+    document.getElementById('btn-play')!.textContent = t('btn.play');
+    const id = getSeedById(this.seedId) ? this.seedId : DEFAULT_SEED_ID;
+    this.plantSeed(id);
+  }
+  public plantSeed(id: string): void {
+    if (!applySeed(this.grid, id)) return;
+    this.seedId = id;
+    this.seedName = getSeedById(id)!.name;
+    this.generation = 0;
+    this.trails.clear();
+    this.voxels.sync(this.grid);
+    this.syncUI();
+    this.toast(t(seedNameKey(id)));
+  }
+  public randomize(): void {
+    this.grid.randomize(this.density);
+    this.seedName = 'Random';
+    this.seedId = '';
+    this.generation = 0;
+    this.trails.clear();
+    this.voxels.sync(this.grid);
+    this.syncUI();
+  }
+  public resizeWorld(size: number): void {
+    const wasPlaying = this.playing;
+    this.playing = false;
+    const old = this.grid;
+    this.rebuildGrid(size);
+    const oHalf = Math.floor(old.size / 2);
+    const nHalf = Math.floor(size / 2);
+    for (let z = 0; z < old.size; z++) {
+      for (let y = 0; y < old.size; y++) {
+        for (let x = 0; x < old.size; x++) {
+          const age = old.get(x, y, z);
+          if (!age) continue;
+          const nx = x - oHalf + nHalf;
+          const ny = y - oHalf + nHalf;
+          const nz = z - oHalf + nHalf;
+          this.grid.set(nx, ny, nz, age);
+        }
+      }
+    }
+    this.voxels.sync(this.grid);
+    const slice = document.getElementById('slice') as HTMLInputElement;
+    slice.max = String(size - 1);
+    slice.value = String(Math.floor(size / 2));
+    document.getElementById('slice-val')!.textContent = slice.value;
+    document.getElementById('size-val')!.textContent = String(size);
+    this.syncUI();
+    this.playing = wasPlaying;
+    if (wasPlaying) document.getElementById('btn-play')!.textContent = t('btn.pause');
+  }
+  public exportJSON(): void {
+    const blob = new Blob([snapshotToJSON(this.makeSnapshot())], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `voxel-genesis-gen${this.generation}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    this.toast(t('toast.exported'));
+  }
+  public syncUI(): void {
+    document.getElementById('rule-notation')!.textContent = this.rule.notation;
+    (document.getElementById('rule-custom') as HTMLInputElement).value = this.rule.notation;
+    (document.getElementById('boundary') as HTMLSelectElement).value = this.boundary;
+    (document.getElementById('speed') as HTMLInputElement).value = String(this.speed);
+    document.getElementById('speed-val')!.textContent = String(this.speed);
+    (document.getElementById('density') as HTMLInputElement).value = String(this.density);
+    document.getElementById('density-val')!.textContent = this.density.toFixed(2);
+    (document.getElementById('size') as HTMLInputElement).value = String(this.grid.size);
+    document.getElementById('size-val')!.textContent = String(this.grid.size);
+    const preset = RULE_PRESETS.find((p) => p.notation === this.rule.notation);
+    const sel = document.getElementById('rule-preset') as HTMLSelectElement;
+    if (preset) sel.value = preset.id;
+    const seedSel = document.getElementById('seed-select') as HTMLSelectElement;
+    if (this.seedId && getSeedById(this.seedId)) seedSel.value = this.seedId;
+    this.syncStats();
+  }
+  public syncStats(): void {
+    document.getElementById('stat-gen')!.textContent = String(this.generation);
+    document.getElementById('stat-pop')!.textContent = String(this.grid.population);
+    document.getElementById('stat-rule')!.textContent = this.rule.notation;
+    document.getElementById('stat-seed')!.textContent = this.displaySeedName();
+  }
+  public showFirstHint(): void {
+    try {
+      if (localStorage.getItem(HINT_KEY) === '1') {
+        document.getElementById('first-hint')?.classList.add('hidden');
+      }
+    } catch {
+    }
+  }
+  public dismissHint(): void {
+    document.getElementById('first-hint')?.classList.add('hidden');
+    try {
+      localStorage.setItem(HINT_KEY, '1');
+    } catch {
+    }
+  }
+  public toast(msg: string): void {
+    const el = document.getElementById('toast')!;
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    window.clearTimeout(this.toastTimer);
+    this.toastTimer = window.setTimeout(() => el.classList.add('hidden'), 2200);
+  }
+  private loop = (): void => { runAppLoop(this as unknown as AppHost); };
+}
+
