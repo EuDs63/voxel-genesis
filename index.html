@@ -2,12 +2,139 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Voxel Genesis — cinematic 3D cellular automaton" />
     <title>Voxel Genesis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <canvas id="c"></canvas>
+
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">◈</span>
+          <div>
+            <h1>Voxel Genesis</h1>
+            <p class="tagline">Life in the void</p>
+          </div>
+        </div>
+        <div class="hud-stats" id="hud-stats">
+          <div class="stat"><span class="label">Gen</span><span id="stat-gen">0</span></div>
+          <div class="stat"><span class="label">Pop</span><span id="stat-pop">0</span></div>
+          <div class="stat"><span class="label">Rule</span><span id="stat-rule">—</span></div>
+          <div class="stat"><span class="label">Seed</span><span id="stat-seed">—</span></div>
+        </div>
+      </header>
+
+      <aside class="panel" id="panel">
+        <section>
+          <h2>Transport</h2>
+          <div class="row">
+            <button type="button" id="btn-play" class="primary" title="Space">Play</button>
+            <button type="button" id="btn-step" title="N">Step</button>
+            <button type="button" id="btn-reset" title="R">Reset</button>
+            <button type="button" id="btn-rand" title="G">Random</button>
+          </div>
+          <label class="slider-label">Speed <span id="speed-val">8</span> gen/s</label>
+          <input type="range" id="speed" min="1" max="30" value="8" />
+        </section>
+
+        <section>
+          <h2>World</h2>
+          <label>Size <span id="size-val">24</span>³</label>
+          <input type="range" id="size" min="12" max="40" value="24" step="2" />
+          <label>Density <span id="density-val">0.12</span></label>
+          <input type="range" id="density" min="0.02" max="0.4" value="0.12" step="0.01" />
+          <label>Boundary</label>
+          <select id="boundary">
+            <option value="clamp">Clamp (void edge)</option>
+            <option value="wrap">Wrap (torus)</option>
+          </select>
+        </section>
+
+        <section>
+          <h2>Rules</h2>
+          <select id="rule-preset"></select>
+          <p class="hint-text" id="rule-desc"></p>
+          <label>Custom B/S</label>
+          <div class="row">
+            <input type="text" id="rule-custom" placeholder="B4-6/S5-7" spellcheck="false" />
+            <button type="button" id="btn-apply-rule">Apply</button>
+          </div>
+          <p class="mono" id="rule-notation">B4-6/S5-7</p>
+        </section>
+
+        <section>
+          <h2>Seeds</h2>
+          <select id="seed-select"></select>
+          <button type="button" id="btn-seed" class="wide">Plant Seed</button>
+        </section>
+
+        <section>
+          <h2>Paint Slice</h2>
+          <div class="row">
+            <button type="button" id="axis-x" class="axis">X</button>
+            <button type="button" id="axis-y" class="axis active">Y</button>
+            <button type="button" id="axis-z" class="axis">Z</button>
+            <button type="button" id="btn-slice-toggle" title="P">Hide</button>
+          </div>
+          <label>Plane <span id="slice-val">12</span></label>
+          <input type="range" id="slice" min="0" max="23" value="12" />
+          <p class="hint-text">Click slice to paint · Shift+click erase · [ ] nudge plane</p>
+        </section>
+
+        <section>
+          <h2>View</h2>
+          <div class="row wrap">
+            <button type="button" id="btn-orbit" class="toggle on">Auto-orbit</button>
+            <button type="button" id="btn-trails" class="toggle on">Time trails</button>
+            <button type="button" id="btn-bloom" class="toggle on">Bloom</button>
+          </div>
+        </section>
+
+        <section>
+          <h2>Share</h2>
+          <div class="row">
+            <button type="button" id="btn-export">Export JSON</button>
+            <button type="button" id="btn-import">Import</button>
+            <button type="button" id="btn-share">Copy URL</button>
+          </div>
+          <input type="file" id="import-file" accept="application/json,.json" hidden />
+        </section>
+
+        <section class="shortcuts">
+          <h2>Keys</h2>
+          <ul>
+            <li><kbd>Space</kbd> play/pause</li>
+            <li><kbd>N</kbd> step · <kbd>R</kbd> reset · <kbd>G</kbd> random</li>
+            <li><kbd>P</kbd> toggle paint plane</li>
+            <li><kbd>[</kbd> <kbd>]</kbd> move plane</li>
+            <li><kbd>X</kbd> <kbd>Y</kbd> <kbd>Z</kbd> plane axis</li>
+            <li><kbd>O</kbd> auto-orbit · <kbd>T</kbd> trails</li>
+            <li><kbd>?</kbd> toggle this panel</li>
+          </ul>
+        </section>
+      </aside>
+
+      <button type="button" id="btn-panel" class="fab" title="Toggle panel">☰</button>
+
+      <div id="toast" class="toast hidden"></div>
+
+      <div id="first-hint" class="first-hint">
+        <div class="first-hint-card">
+          <h2>Welcome to the void</h2>
+          <p>
+            Ember and cyan cells live by 26-neighbor rules. Drag to orbit, scroll to zoom.
+            Plant a seed, press <kbd>Space</kbd>, and watch worlds bloom.
+          </p>
+          <p class="hint-text">Paint on the glowing slice plane. Time trails ghost recent generations.</p>
+          <button type="button" id="btn-dismiss-hint" class="primary wide">Enter Voxel Genesis</button>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
