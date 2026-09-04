@@ -19,144 +19,150 @@
           <span class="brand-mark">◈</span>
           <div>
             <h1>Voxel Genesis</h1>
-            <p class="tagline">Life in the void</p>
+            <p class="tagline" data-i18n="brand.tagline">Life in the void</p>
+          </div>
+          <div class="lang-toggle" id="lang-toggle" role="group" data-i18n-aria="lang.aria">
+            <button type="button" class="lang-btn" data-locale="zh" aria-pressed="false">中文</button>
+            <button type="button" class="lang-btn" data-locale="en" aria-pressed="false">EN</button>
           </div>
         </div>
         <div class="hud-stats" id="hud-stats">
-          <div class="stat"><span class="label">Gen</span><span id="stat-gen">0</span></div>
-          <div class="stat"><span class="label">Pop</span><span id="stat-pop">0</span></div>
-          <div class="stat"><span class="label">Rule</span><span id="stat-rule">—</span></div>
-          <div class="stat"><span class="label">Seed</span><span id="stat-seed">—</span></div>
+          <div class="stat"><span class="label" data-i18n="stat.gen">Gen</span><span id="stat-gen">0</span></div>
+          <div class="stat"><span class="label" data-i18n="stat.pop">Pop</span><span id="stat-pop">0</span></div>
+          <div class="stat"><span class="label" data-i18n="stat.rule">Rule</span><span id="stat-rule">—</span></div>
+          <div class="stat"><span class="label" data-i18n="stat.seed">Seed</span><span id="stat-seed">—</span></div>
         </div>
       </header>
 
       <aside class="panel" id="panel">
         <section>
-          <h2>Transport</h2>
+          <h2 data-i18n="section.transport">Transport</h2>
           <div class="row">
-            <button type="button" id="btn-play" class="primary" title="Space">Play</button>
-            <button type="button" id="btn-step" title="N">Step</button>
-            <button type="button" id="btn-reset" title="R">Reset</button>
-            <button type="button" id="btn-rand" title="G">Random</button>
+            <button type="button" id="btn-play" class="primary" title="Space" data-i18n="btn.play">Play</button>
+            <button type="button" id="btn-step" title="N" data-i18n="btn.step">Step</button>
+            <button type="button" id="btn-reset" title="R" data-i18n="btn.reset">Reset</button>
+            <button type="button" id="btn-rand" title="G" data-i18n="btn.random">Random</button>
           </div>
-          <label class="slider-label">Speed <span id="speed-val">8</span> gen/s</label>
+          <label class="slider-label"><span data-i18n="transport.speed">Speed</span> <span id="speed-val">8</span> <span data-i18n="transport.genPerSec">gen/s</span></label>
           <input type="range" id="speed" min="1" max="30" value="8" />
         </section>
 
         <section>
-          <h2>World</h2>
-          <label>Size <span id="size-val">24</span>³</label>
+          <h2 data-i18n="section.world">World</h2>
+          <label><span data-i18n="world.size">Size</span> <span id="size-val">24</span>³</label>
           <input type="range" id="size" min="12" max="40" value="24" step="2" />
-          <label>Density <span id="density-val">0.08</span></label>
+          <label><span data-i18n="world.density">Density</span> <span id="density-val">0.08</span></label>
           <input type="range" id="density" min="0.02" max="0.35" value="0.08" step="0.01" />
-          <label>Boundary</label>
+          <label data-i18n="world.boundary">Boundary</label>
           <select id="boundary">
-            <option value="clamp">Clamp (void edge)</option>
-            <option value="wrap">Wrap (torus)</option>
+            <option value="clamp" data-i18n="boundary.clamp">Clamp (void edge)</option>
+            <option value="wrap" data-i18n="boundary.wrap">Wrap (torus)</option>
           </select>
         </section>
 
         <section>
-          <h2>Rules</h2>
+          <h2 data-i18n="section.rules">Rules</h2>
           <select id="rule-preset"></select>
           <p class="hint-text" id="rule-desc"></p>
-          <label>Custom B/S</label>
+          <label data-i18n="rules.customBS">Custom B/S</label>
           <div class="row">
             <input type="text" id="rule-custom" placeholder="B4/S4-5" spellcheck="false" />
-            <button type="button" id="btn-apply-rule">Apply</button>
+            <button type="button" id="btn-apply-rule" data-i18n="btn.apply">Apply</button>
           </div>
           <p class="mono" id="rule-notation">B4/S4-5</p>
         </section>
 
         <section>
-          <h2>Seeds</h2>
+          <h2 data-i18n="section.seeds">Seeds</h2>
           <select id="seed-select"></select>
           <p class="hint-text" id="seed-desc"></p>
-          <button type="button" id="btn-seed" class="wide">Plant Seed</button>
+          <button type="button" id="btn-seed" class="wide" data-i18n="btn.plantSeed">Plant Seed</button>
         </section>
 
         <section>
-          <h2>Paint Slice</h2>
+          <h2 data-i18n="section.paint">Paint Slice</h2>
           <div class="row mode-toggle">
-            <button type="button" id="btn-mode-orbit" class="mode-btn active">Orbit</button>
-            <button type="button" id="btn-mode-paint" class="mode-btn">Paint</button>
+            <button type="button" id="btn-mode-orbit" class="mode-btn active" data-i18n="btn.orbit">Orbit</button>
+            <button type="button" id="btn-mode-paint" class="mode-btn" data-i18n="btn.paint">Paint</button>
           </div>
           <div class="row">
             <button type="button" id="axis-x" class="axis">X</button>
             <button type="button" id="axis-y" class="axis active">Y</button>
             <button type="button" id="axis-z" class="axis">Z</button>
-            <button type="button" id="btn-slice-toggle" title="P">Hide</button>
+            <button type="button" id="btn-slice-toggle" title="P" data-i18n="btn.hide">Hide</button>
           </div>
-          <label>Plane <span id="slice-val">12</span></label>
+          <label><span data-i18n="paint.plane">Plane</span> <span id="slice-val">12</span></label>
           <input type="range" id="slice" min="0" max="23" value="12" />
-          <label>Brush <span id="brush-val">1</span>³</label>
+          <label><span data-i18n="paint.brush">Brush</span> <span id="brush-val">1</span>³</label>
           <input type="range" id="brush" min="0" max="3" value="0" step="1" />
-          <label>Symmetry</label>
+          <label data-i18n="paint.symmetry">Symmetry</label>
           <select id="symmetry"></select>
           <p class="hint-text">
-            Hover shows snap-to-grid highlight · Shift erase · cell
+            <span data-i18n="paint.hint.before">Hover shows snap-to-grid highlight · Shift erase · cell</span>
             <span class="mono inline" id="paint-coord">—</span>
           </p>
         </section>
 
         <section>
-          <h2>Camera</h2>
+          <h2 data-i18n="section.camera">Camera</h2>
           <div class="row wrap" id="camera-presets"></div>
-          <p class="hint-text">Keys 1–5 · respects reduced motion</p>
+          <p class="hint-text" data-i18n="camera.hint">Keys 1–5 · respects reduced motion</p>
         </section>
 
         <section>
-          <h2>View</h2>
+          <h2 data-i18n="section.view">View</h2>
           <div class="row wrap">
-            <button type="button" id="btn-orbit" class="toggle on">Auto-orbit</button>
-            <button type="button" id="btn-trails" class="toggle on">Time trails</button>
-            <button type="button" id="btn-bloom" class="toggle on">Bloom</button>
+            <button type="button" id="btn-orbit" class="toggle on" data-i18n="btn.autoOrbit">Auto-orbit</button>
+            <button type="button" id="btn-trails" class="toggle on" data-i18n="btn.trails">Time trails</button>
+            <button type="button" id="btn-bloom" class="toggle on" data-i18n="btn.bloom">Bloom</button>
           </div>
         </section>
 
         <section>
-          <h2>Share</h2>
+          <h2 data-i18n="section.share">Share</h2>
           <div class="row">
-            <button type="button" id="btn-export">Export JSON</button>
-            <button type="button" id="btn-import">Import</button>
-            <button type="button" id="btn-share">Copy URL</button>
+            <button type="button" id="btn-export" data-i18n="btn.export">Export JSON</button>
+            <button type="button" id="btn-import" data-i18n="btn.import">Import</button>
+            <button type="button" id="btn-share" data-i18n="btn.share">Copy URL</button>
           </div>
           <input type="file" id="import-file" accept="application/json,.json" hidden />
         </section>
 
         <section class="shortcuts">
-          <h2>Keys</h2>
+          <h2 data-i18n="section.keys">Keys</h2>
           <ul>
-            <li><kbd>Space</kbd> play/pause</li>
-            <li><kbd>N</kbd> step · <kbd>R</kbd> reset · <kbd>G</kbd> random</li>
-            <li><kbd>M</kbd> orbit / paint mode</li>
-            <li><kbd>P</kbd> toggle paint plane</li>
-            <li><kbd>[</kbd> <kbd>]</kbd> move plane</li>
-            <li><kbd>X</kbd> <kbd>Y</kbd> <kbd>Z</kbd> plane axis</li>
-            <li><kbd>1</kbd>–<kbd>5</kbd> camera presets</li>
-            <li><kbd>O</kbd> auto-orbit · <kbd>T</kbd> trails</li>
-            <li><kbd>?</kbd> toggle this panel</li>
+            <li><kbd>Space</kbd> <span data-i18n="keys.playPause">play/pause</span></li>
+            <li><kbd>N</kbd> <span data-i18n="keys.stepResetRandom">step · reset · random</span> · <kbd>R</kbd> · <kbd>G</kbd></li>
+            <li><kbd>M</kbd> <span data-i18n="keys.mode">orbit / paint mode</span></li>
+            <li><kbd>P</kbd> <span data-i18n="keys.togglePlane">toggle paint plane</span></li>
+            <li><kbd>[</kbd> <kbd>]</kbd> <span data-i18n="keys.movePlane">move plane</span></li>
+            <li><kbd>X</kbd> <kbd>Y</kbd> <kbd>Z</kbd> <span data-i18n="keys.planeAxis">plane axis</span></li>
+            <li><kbd>1</kbd>–<kbd>5</kbd> <span data-i18n="keys.cameraPresets">camera presets</span></li>
+            <li><kbd>O</kbd> <span data-i18n="keys.orbitTrails">auto-orbit · trails</span> · <kbd>T</kbd></li>
+            <li><kbd>?</kbd> <span data-i18n="keys.togglePanel">toggle this panel</span></li>
           </ul>
         </section>
       </aside>
 
-      <button type="button" id="btn-panel" class="fab" title="Toggle panel">☰</button>
-      <button type="button" id="btn-mode-fab" class="fab fab-mode" title="Orbit mode (tap for Paint)">🕹</button>
+      <button type="button" id="btn-panel" class="fab" data-i18n-title="btn.panelTitle" title="Toggle panel">☰</button>
+      <button type="button" id="btn-mode-fab" class="fab fab-mode" data-i18n-title="mode.fabOrbit" title="Orbit mode (tap for Paint)">🕹</button>
 
       <div id="toast" class="toast hidden"></div>
 
       <div id="first-hint" class="first-hint">
         <div class="first-hint-card">
-          <h2>Welcome to the void</h2>
+          <h2 data-i18n="hint.title">Welcome to the void</h2>
           <p>
-            Ember and cyan cells live by 26-neighbor rules. Drag to orbit, scroll to zoom.
-            Plant a seed, press <kbd>Space</kbd>, and watch worlds breathe.
+            <span data-i18n="hint.p1a">Ember and cyan cells live by 26-neighbor rules. Drag to orbit, scroll to zoom. Plant a seed, press</span>
+            <kbd>Space</kbd>
+            <span data-i18n="hint.p1b">, and watch worlds breathe.</span>
           </p>
           <p class="hint-text">
-            Switch to <strong>Paint</strong> mode for snap-to-grid aiming on the slice.
-            Camera presets 1–5 for cinematic framing.
+            <span data-i18n="hint.p2a">Switch to</span>
+            <strong data-i18n="mode.paint">Paint</strong>
+            <span data-i18n="hint.p2b">mode for snap-to-grid aiming on the slice. Camera presets 1–5 for cinematic framing.</span>
           </p>
-          <button type="button" id="btn-dismiss-hint" class="primary wide">Enter Voxel Genesis</button>
+          <button type="button" id="btn-dismiss-hint" class="primary wide" data-i18n="btn.dismissHint">Enter Voxel Genesis</button>
         </div>
       </div>
     </div>
