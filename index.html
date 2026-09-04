@@ -2,8 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Voxel Genesis — cinematic 3D cellular automaton" />
+    <meta name="theme-color" content="#050508" />
     <title>Voxel Genesis</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,7 +12,7 @@
   </head>
   <body>
     <div id="app">
-      <canvas id="c"></canvas>
+      <canvas id="c" class="mode-orbit"></canvas>
 
       <header class="topbar">
         <div class="brand">
@@ -46,8 +47,8 @@
           <h2>World</h2>
           <label>Size <span id="size-val">24</span>³</label>
           <input type="range" id="size" min="12" max="40" value="24" step="2" />
-          <label>Density <span id="density-val">0.12</span></label>
-          <input type="range" id="density" min="0.02" max="0.4" value="0.12" step="0.01" />
+          <label>Density <span id="density-val">0.08</span></label>
+          <input type="range" id="density" min="0.02" max="0.35" value="0.08" step="0.01" />
           <label>Boundary</label>
           <select id="boundary">
             <option value="clamp">Clamp (void edge)</option>
@@ -61,20 +62,25 @@
           <p class="hint-text" id="rule-desc"></p>
           <label>Custom B/S</label>
           <div class="row">
-            <input type="text" id="rule-custom" placeholder="B4-6/S5-7" spellcheck="false" />
+            <input type="text" id="rule-custom" placeholder="B4/S4-5" spellcheck="false" />
             <button type="button" id="btn-apply-rule">Apply</button>
           </div>
-          <p class="mono" id="rule-notation">B4-6/S5-7</p>
+          <p class="mono" id="rule-notation">B4/S4-5</p>
         </section>
 
         <section>
           <h2>Seeds</h2>
           <select id="seed-select"></select>
+          <p class="hint-text" id="seed-desc"></p>
           <button type="button" id="btn-seed" class="wide">Plant Seed</button>
         </section>
 
         <section>
           <h2>Paint Slice</h2>
+          <div class="row mode-toggle">
+            <button type="button" id="btn-mode-orbit" class="mode-btn active">Orbit</button>
+            <button type="button" id="btn-mode-paint" class="mode-btn">Paint</button>
+          </div>
           <div class="row">
             <button type="button" id="axis-x" class="axis">X</button>
             <button type="button" id="axis-y" class="axis active">Y</button>
@@ -83,7 +89,20 @@
           </div>
           <label>Plane <span id="slice-val">12</span></label>
           <input type="range" id="slice" min="0" max="23" value="12" />
-          <p class="hint-text">Click slice to paint · Shift+click erase · [ ] nudge plane</p>
+          <label>Brush <span id="brush-val">1</span>³</label>
+          <input type="range" id="brush" min="0" max="3" value="0" step="1" />
+          <label>Symmetry</label>
+          <select id="symmetry"></select>
+          <p class="hint-text">
+            Hover shows snap-to-grid highlight · Shift erase · cell
+            <span class="mono inline" id="paint-coord">—</span>
+          </p>
+        </section>
+
+        <section>
+          <h2>Camera</h2>
+          <div class="row wrap" id="camera-presets"></div>
+          <p class="hint-text">Keys 1–5 · respects reduced motion</p>
         </section>
 
         <section>
@@ -110,9 +129,11 @@
           <ul>
             <li><kbd>Space</kbd> play/pause</li>
             <li><kbd>N</kbd> step · <kbd>R</kbd> reset · <kbd>G</kbd> random</li>
+            <li><kbd>M</kbd> orbit / paint mode</li>
             <li><kbd>P</kbd> toggle paint plane</li>
             <li><kbd>[</kbd> <kbd>]</kbd> move plane</li>
             <li><kbd>X</kbd> <kbd>Y</kbd> <kbd>Z</kbd> plane axis</li>
+            <li><kbd>1</kbd>–<kbd>5</kbd> camera presets</li>
             <li><kbd>O</kbd> auto-orbit · <kbd>T</kbd> trails</li>
             <li><kbd>?</kbd> toggle this panel</li>
           </ul>
@@ -120,6 +141,7 @@
       </aside>
 
       <button type="button" id="btn-panel" class="fab" title="Toggle panel">☰</button>
+      <button type="button" id="btn-mode-fab" class="fab fab-mode" title="Orbit mode (tap for Paint)">🕹</button>
 
       <div id="toast" class="toast hidden"></div>
 
@@ -128,9 +150,12 @@
           <h2>Welcome to the void</h2>
           <p>
             Ember and cyan cells live by 26-neighbor rules. Drag to orbit, scroll to zoom.
-            Plant a seed, press <kbd>Space</kbd>, and watch worlds bloom.
+            Plant a seed, press <kbd>Space</kbd>, and watch worlds breathe.
           </p>
-          <p class="hint-text">Paint on the glowing slice plane. Time trails ghost recent generations.</p>
+          <p class="hint-text">
+            Switch to <strong>Paint</strong> mode for snap-to-grid aiming on the slice.
+            Camera presets 1–5 for cinematic framing.
+          </p>
           <button type="button" id="btn-dismiss-hint" class="primary wide">Enter Voxel Genesis</button>
         </div>
       </div>
