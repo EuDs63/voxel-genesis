@@ -1,5 +1,5 @@
 /**
- * Three.js scene: dark void, fog, lights, bloom, orbit controls.
+ * Three.js scene: dark void, fog, lights, bloom, orbit controls, camera presets.
  */
 
 import * as THREE from 'three';
@@ -8,6 +8,11 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import {
+  CameraDirector,
+  getCameraPreset,
+  type CameraPresetId,
+} from './camera';
 
 export interface SceneOptions {
   reducedMotion: boolean;
@@ -19,16 +24,21 @@ export class GenesisScene {
   readonly camera: THREE.PerspectiveCamera;
   readonly controls: OrbitControls;
   readonly root = new THREE.Group();
+  readonly director = new CameraDirector();
   private composer: EffectComposer | null = null;
   private bloomPass: UnrealBloomPass | null = null;
   private readonly clock = new THREE.Clock();
+  private _dt = 1 / 60;
   autoOrbit = true;
   private reducedMotion: boolean;
   private boundsHelper: THREE.LineSegments | null = null;
+  private gridSize = 24;
+  private pendingOrbit: boolean | null = null;
 
   constructor(canvas: HTMLCanvasElement, opts: SceneOptions) {
     this.reducedMotion = opts.reducedMotion;
     this.autoOrbit = !opts.reducedMotion;
+    this.director.setReducedMotion(opts.reducedMotion);
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -58,7 +68,6 @@ export class GenesisScene {
     this.controls.autoRotate = this.autoOrbit;
     this.controls.autoRotateSpeed = 0.55;
 
-    // Lights
     const amb = new THREE.AmbientLight(0x1a2030, 0.55);
     const key = new THREE.PointLight(0xff7a3d, 0.6, 120, 2);
     key.position.set(20, 30, 15);
@@ -69,7 +78,6 @@ export class GenesisScene {
 
     this.scene.add(amb, key, fill, rim, this.root);
 
-    // Soft floor glow disk
     const disk = new THREE.Mesh(
       new THREE.CircleGeometry(40, 64),
       new THREE.MeshBasicMaterial({
@@ -114,10 +122,34 @@ export class GenesisScene {
 
   setAutoOrbit(on: boolean): void {
     this.autoOrbit = on && !this.reducedMotion;
-    this.controls.autoRotate = this.autoOrbit;
+    if (!this.director.isAnimating) {
+      this.controls.autoRotate = this.autoOrbit;
+    } else {
+      this.pendingOrbit = this.autoOrbit;
+    }
+  }
+
+  applyCameraPreset(id: CameraPresetId): boolean {
+    const preset = getCameraPreset(id);
+    if (!preset) return false;
+    this.pendingOrbit = !!preset.autoOrbit && !this.reducedMotion;
+    if (preset.autoOrbit && !this.reducedMotion) {
+      this.autoOrbit = true;
+    } else if (!preset.autoOrbit) {
+      this.autoOrbit = false;
+    }
+    this.director.goTo(this.camera, this.controls, this.gridSize, preset, () => {
+      if (this.pendingOrbit != null) {
+        this.controls.autoRotate = this.pendingOrbit;
+        this.autoOrbit = this.controls.autoRotate;
+        this.pendingOrbit = null;
+      }
+    });
+    return true;
   }
 
   updateBounds(size: number): void {
+    this.gridSize = size;
     if (this.boundsHelper) {
       this.root.remove(this.boundsHelper);
       this.boundsHelper.geometry.dispose();
@@ -130,7 +162,6 @@ export class GenesisScene {
       new THREE.LineBasicMaterial({ color: 0x1a2233, transparent: true, opacity: 0.35 }),
     );
     this.root.add(this.boundsHelper);
-    // Frame camera distance
     const dist = size * 1.85;
     this.controls.minDistance = size * 0.4;
     this.controls.maxDistance = size * 6;
@@ -139,14 +170,19 @@ export class GenesisScene {
     }
   }
 
-  render(): void {
-    this.controls.update();
-    if (this.composer) this.composer.render();
-    else this.renderer.render(this.scene, this.camera);
+  /** Advance the clock once per frame (call before render). */
+  get delta(): number {
+    this._dt = this.clock.getDelta();
+    return this._dt;
   }
 
-  get delta(): number {
-    return this.clock.getDelta();
+  render(): void {
+    this.director.update(this.camera, this.controls, this._dt);
+    if (!this.director.isAnimating) {
+      this.controls.update();
+    }
+    if (this.composer) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
   }
 
   private onResize = (): void => {
