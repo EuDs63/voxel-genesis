@@ -1,7 +1,3 @@
-/**
- * Voxel Genesis — application controller.
- */
-
 import * as THREE from 'three';
 import { Grid3D, type BoundaryMode } from './sim/grid';
 import { stepInPlace } from './sim/ca';
@@ -16,6 +12,12 @@ import {
 } from './sim/rules';
 import { SEEDS, DEFAULT_SEED_ID, applySeed, getSeedById } from './sim/seeds';
 import {
+  SYMMETRY_OPTIONS,
+  expandSymmetry,
+  brushCellsOnSlice,
+  type SymmetryMode,
+} from './sim/symmetry';
+import {
   type AppSnapshot,
   encodeCells,
   applySnapshot,
@@ -28,9 +30,9 @@ import { GenesisScene, prefersReducedMotion } from './render/scene';
 import { VoxelRenderer } from './render/voxels';
 import { TrailRenderer } from './render/trails';
 import { SlicePlane, type SliceAxis } from './render/slice';
-
+import { CAMERA_PRESETS, type CameraPresetId } from './render/camera';
 const HINT_KEY = 'voxel-genesis-hint-dismissed';
-
+export type InteractionMode = 'orbit' | 'paint';
 export class App {
   private scene: GenesisScene;
   private voxels: VoxelRenderer;
@@ -43,7 +45,7 @@ export class App {
   private generation = 0;
   private playing = false;
   private speed = 8;
-  private density = 0.12;
+  private density = 0.08;
   private seedName = 'Genesis Spark';
   private seedId = DEFAULT_SEED_ID;
   private accum = 0;
@@ -54,41 +56,43 @@ export class App {
   private reducedMotion: boolean;
   private trailsEnabled = true;
   private toastTimer = 0;
-
+  private symmetry: SymmetryMode = 'none';
+  private brushRadius = 0;
+  private interactionMode: InteractionMode = 'orbit';
+  private lastPaintKey = '';
   constructor(canvas: HTMLCanvasElement) {
     this.reducedMotion = prefersReducedMotion();
     this.scene = new GenesisScene(canvas, { reducedMotion: this.reducedMotion });
     this.grid = new Grid3D(24);
     this.scratch = new Grid3D(24);
     this.rule = getDefaultRule();
-
     this.voxels = new VoxelRenderer(24 * 24 * 24);
     this.trails = new TrailRenderer(5, 30000);
     this.slice = new SlicePlane();
     this.slice.setGridSize(24);
     this.slice.setIndex(12);
-
     this.scene.root.add(this.voxels.mesh);
     this.scene.root.add(this.trails.mesh);
     this.scene.root.add(this.slice.group);
     this.scene.updateBounds(24);
-
     if (this.reducedMotion) {
       this.trails.setEnabled(false);
       this.trailsEnabled = false;
       this.scene.setBloom(false);
       this.scene.setAutoOrbit(false);
     }
-
+    if (window.matchMedia('(pointer: coarse)').matches) {
+      this.interactionMode = 'orbit';
+    }
     this.bindUI();
     this.bindInput(canvas);
     this.tryLoadHash() || this.plantDefault();
     this.syncUI();
+    this.applyInteractionMode();
     this.voxels.sync(this.grid);
     this.showFirstHint();
     this.loop();
   }
-
   private plantDefault(): void {
     applySeed(this.grid, DEFAULT_SEED_ID);
     this.seedId = DEFAULT_SEED_ID;
@@ -96,7 +100,6 @@ export class App {
     this.generation = 0;
     this.rule = getDefaultRule();
   }
-
   private tryLoadHash(): boolean {
     const snap = readHash();
     if (!snap) return false;
@@ -108,7 +111,6 @@ export class App {
       return false;
     }
   }
-
   private loadSnapshot(snap: AppSnapshot): void {
     const applied = applySnapshot(snap);
     this.rebuildGrid(applied.grid.size);
@@ -123,7 +125,6 @@ export class App {
     this.voxels.sync(this.grid);
     this.syncUI();
   }
-
   private rebuildGrid(size: number): void {
     this.grid = new Grid3D(size);
     this.scratch = new Grid3D(size);
@@ -137,7 +138,6 @@ export class App {
     this.scene.root.add(this.voxels.mesh);
     this.trails.clear();
   }
-
   private makeSnapshot(): AppSnapshot {
     return {
       v: 1,
@@ -153,7 +153,6 @@ export class App {
       playing: this.playing,
     };
   }
-
   private bindUI(): void {
     const $ = (id: string) => document.getElementById(id)!;
     const presetSel = $('rule-preset') as HTMLSelectElement;
@@ -172,11 +171,40 @@ export class App {
       seedSel.appendChild(opt);
     }
     seedSel.value = DEFAULT_SEED_ID;
+    const symSel = $('symmetry') as HTMLSelectElement;
+    for (const s of SYMMETRY_OPTIONS) {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.label;
+      symSel.appendChild(opt);
+    }
+    symSel.value = 'none';
+    symSel.onchange = () => {
+      this.symmetry = symSel.value as SymmetryMode;
+      this.toast(`Symmetry: ${SYMMETRY_OPTIONS.find((o) => o.id === this.symmetry)?.label}`);
+    };
+    const camRow = $('camera-presets');
+    for (const p of CAMERA_PRESETS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cam-preset';
+      btn.dataset.preset = p.id;
+      btn.textContent = p.label;
+      btn.onclick = () => this.goCamera(p.id);
+      camRow.appendChild(btn);
+    }
     $('btn-play').onclick = () => this.togglePlay();
     $('btn-step').onclick = () => this.doStep();
     $('btn-reset').onclick = () => this.reset();
     $('btn-rand').onclick = () => this.randomize();
-    $('btn-seed').onclick = () => { this.plantSeed(seedSel.value); };
+    $('btn-seed').onclick = () => {
+      this.plantSeed(seedSel.value);
+    };
+    seedSel.onchange = () => {
+      const s = getSeedById(seedSel.value);
+      $('seed-desc').textContent = s?.description ?? '';
+    };
+    seedSel.dispatchEvent(new Event('change'));
     presetSel.onchange = () => {
       const p = getPresetById(presetSel.value);
       if (!p) return;
@@ -202,8 +230,12 @@ export class App {
       $('speed-val').textContent = String(this.speed);
     };
     const size = $('size') as HTMLInputElement;
-    size.onchange = () => { this.resizeWorld(Number(size.value)); };
-    size.oninput = () => { $('size-val').textContent = size.value; };
+    size.onchange = () => {
+      this.resizeWorld(Number(size.value));
+    };
+    size.oninput = () => {
+      $('size-val').textContent = size.value;
+    };
     const dens = $('density') as HTMLInputElement;
     dens.oninput = () => {
       this.density = Number(dens.value);
@@ -217,6 +249,13 @@ export class App {
       this.slice.setIndex(Number(slice.value));
       $('slice-val').textContent = slice.value;
     };
+    const brush = $('brush') as HTMLInputElement;
+    brush.oninput = () => {
+      this.brushRadius = Number(brush.value);
+      this.slice.setBrushRadius(this.brushRadius);
+      $('brush-val').textContent = String(this.brushRadius * 2 + 1);
+    };
+    this.slice.setBrushRadius(this.brushRadius);
     const setAxis = (axis: SliceAxis) => {
       this.slice.setAxis(axis);
       document.querySelectorAll('.axis').forEach((b) => b.classList.remove('active'));
@@ -266,11 +305,18 @@ export class App {
         await navigator.clipboard.writeText(location.href);
         this.toast('URL copied');
       } catch {
-        this.toast('Hash updated — copy address bar');
+        this.toast('Hash updated - copy address bar');
       }
     };
-    $('btn-panel').onclick = () => { $('panel').classList.toggle('collapsed'); };
+    $('btn-panel').onclick = () => {
+      $('panel').classList.toggle('collapsed');
+    };
     $('btn-dismiss-hint').onclick = () => this.dismissHint();
+    $('btn-mode-orbit').onclick = () => this.setInteractionMode('orbit');
+    $('btn-mode-paint').onclick = () => this.setInteractionMode('paint');
+    $('btn-mode-fab').onclick = () => {
+      this.setInteractionMode(this.interactionMode === 'paint' ? 'orbit' : 'paint');
+    };
     const updateDesc = () => {
       const p = getPresetById(presetSel.value);
       $('rule-desc').textContent = p?.description ?? 'Custom birth/survive rule';
@@ -278,13 +324,55 @@ export class App {
     presetSel.addEventListener('change', updateDesc);
     updateDesc();
   }
-
+  private goCamera(id: CameraPresetId): void {
+    if (!this.scene.applyCameraPreset(id)) return;
+    document.querySelectorAll('.cam-preset').forEach((b) => {
+      b.classList.toggle('active', (b as HTMLElement).dataset.preset === id);
+    });
+    const on = this.scene.autoOrbit;
+    document.getElementById('btn-orbit')?.classList.toggle('on', on);
+    this.toast(CAMERA_PRESETS.find((p) => p.id === id)?.label ?? id);
+  }
+  private setInteractionMode(mode: InteractionMode): void {
+    this.interactionMode = mode;
+    this.applyInteractionMode();
+    if (mode === 'paint' && !this.slice.visible) {
+      this.slice.setVisible(true);
+      const btn = document.getElementById('btn-slice-toggle');
+      if (btn) btn.textContent = 'Hide';
+    }
+    this.toast(mode === 'paint' ? 'Paint mode' : 'Orbit mode');
+  }
+  private applyInteractionMode(): void {
+    const paint = this.interactionMode === 'paint';
+    document.getElementById('btn-mode-orbit')?.classList.toggle('active', !paint);
+    document.getElementById('btn-mode-paint')?.classList.toggle('active', paint);
+    const fab = document.getElementById('btn-mode-fab');
+    if (fab) {
+      fab.textContent = paint ? 'P' : 'O';
+      fab.title = paint ? 'Paint mode (tap for Orbit)' : 'Orbit mode (tap for Paint)';
+      fab.classList.toggle('paint-on', paint);
+    }
+    document.getElementById('c')?.classList.toggle('mode-paint', paint);
+    document.getElementById('c')?.classList.toggle('mode-orbit', !paint);
+    document.body.classList.toggle('interaction-paint', paint);
+    if (!this.painting) {
+      this.scene.controls.enabled = !paint || !window.matchMedia('(pointer: coarse)').matches;
+      if (!window.matchMedia('(pointer: coarse)').matches) {
+        this.scene.controls.enabled = true;
+        this.scene.controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+      }
+    }
+  }
   private bindInput(canvas: HTMLCanvasElement): void {
     window.addEventListener('keydown', (e) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.target instanceof HTMLSelectElement) return;
       const k = e.key.toLowerCase();
-      if (k === ' ') { e.preventDefault(); this.togglePlay(); }
-      else if (k === 'n') this.doStep();
+      if (k === ' ') {
+        e.preventDefault();
+        this.togglePlay();
+      } else if (k === 'n') this.doStep();
       else if (k === 'r') this.reset();
       else if (k === 'g') this.randomize();
       else if (k === 'p') this.toggleSlice();
@@ -295,80 +383,121 @@ export class App {
       else if (k === 'z') this.clickAxis('z');
       else if (k === 'o') document.getElementById('btn-orbit')?.click();
       else if (k === 't') document.getElementById('btn-trails')?.click();
-      else if (k === '?' || (e.shiftKey && k === '/')) {
+      else if (k === 'm') {
+        this.setInteractionMode(this.interactionMode === 'paint' ? 'orbit' : 'paint');
+      } else if (k === '?' || (e.shiftKey && k === '/')) {
         document.getElementById('panel')?.classList.toggle('collapsed');
-      }
+      } else if (k === '1') this.goCamera('orbit');
+      else if (k === '2') this.goCamera('hero');
+      else if (k === '3') this.goCamera('top');
+      else if (k === '4') this.goCamera('close');
+      else if (k === '5') this.goCamera('flyby');
     });
     canvas.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       if (!this.slice.visible) return;
+      const coarse = window.matchMedia('(pointer: coarse)').matches;
+      if (coarse && this.interactionMode !== 'paint') return;
       this.updatePointer(e, canvas);
       this.raycaster.setFromCamera(this.pointer, this.scene.camera);
       const cell = this.slice.hitToCell(this.raycaster);
       if (!cell) return;
       e.preventDefault();
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+      }
       this.scene.controls.enabled = false;
       this.painting = true;
       this.paintErase = e.shiftKey;
+      this.lastPaintKey = '';
       this.paintAt(cell.x, cell.y, cell.z);
+      this.slice.setHoverCell(cell);
+      this.slice.flashPaint();
     });
     canvas.addEventListener('pointermove', (e) => {
-      if (!this.painting) return;
       this.updatePointer(e, canvas);
       this.raycaster.setFromCamera(this.pointer, this.scene.camera);
       const cell = this.slice.hitToCell(this.raycaster);
-      if (cell) this.paintAt(cell.x, cell.y, cell.z);
+      if (this.slice.visible) {
+        this.slice.setHoverCell(cell);
+      }
+      if (!this.painting) return;
+      if (cell) {
+        this.paintAt(cell.x, cell.y, cell.z);
+        this.slice.flashPaint();
+      }
     });
-    const endPaint = () => {
+    const endPaint = (e?: PointerEvent) => {
       if (!this.painting) return;
       this.painting = false;
-      this.scene.controls.enabled = true;
+      this.lastPaintKey = '';
+      if (e) {
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch {
+        }
+      }
+      this.applyInteractionMode();
       this.seedName = 'Painted';
       this.syncUI();
     };
     canvas.addEventListener('pointerup', endPaint);
-    canvas.addEventListener('pointerleave', endPaint);
+    canvas.addEventListener('pointercancel', endPaint);
+    canvas.addEventListener('pointerleave', () => {
+      if (!this.painting) this.slice.clearHover();
+    });
   }
-
   private updatePointer(e: PointerEvent, canvas: HTMLCanvasElement): void {
     const rect = canvas.getBoundingClientRect();
     this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   }
-
   private paintAt(x: number, y: number, z: number): void {
-    if (this.paintErase) {
-      if (this.grid.isAlive(x, y, z)) this.grid.set(x, y, z, 0);
-    } else {
-      if (!this.grid.isAlive(x, y, z)) this.grid.set(x, y, z, 1);
+    const key = `${x},${y},${z},${this.paintErase ? 0 : 1},${this.brushRadius},${this.symmetry}`;
+    if (key === this.lastPaintKey) return;
+    this.lastPaintKey = key;
+    const brush = brushCellsOnSlice(x, y, z, this.grid.size, this.slice.axis, this.brushRadius);
+    const alive = !this.paintErase;
+    for (const b of brush) {
+      const mirrored = expandSymmetry(b.x, b.y, b.z, this.grid.size, this.symmetry);
+      for (const c of mirrored) {
+        if (alive) {
+          if (!this.grid.isAlive(c.x, c.y, c.z)) this.grid.set(c.x, c.y, c.z, 1);
+        } else if (this.grid.isAlive(c.x, c.y, c.z)) {
+          this.grid.set(c.x, c.y, c.z, 0);
+        }
+      }
     }
     this.voxels.sync(this.grid);
     this.syncStats();
+    this.updatePaintCoordHud(x, y, z);
   }
-
+  private updatePaintCoordHud(x: number, y: number, z: number): void {
+    const el = document.getElementById('paint-coord');
+    if (el) el.textContent = `${x}, ${y}, ${z}`;
+  }
   private clickAxis(axis: SliceAxis): void {
     document.getElementById(`axis-${axis}`)?.click();
   }
-
   private toggleSlice(): void {
     const v = !this.slice.visible;
     this.slice.setVisible(v);
     const btn = document.getElementById('btn-slice-toggle');
     if (btn) btn.textContent = v ? 'Hide' : 'Show';
+    if (!v) this.slice.clearHover();
   }
-
   private nudgeSlice(d: number): void {
     this.slice.nudge(d);
     const el = document.getElementById('slice') as HTMLInputElement;
     el.value = String(this.slice.index);
     document.getElementById('slice-val')!.textContent = String(this.slice.index);
   }
-
   private togglePlay(): void {
     this.playing = !this.playing;
-    document.getElementById('btn-play')!.textContent = this.playing ? 'Pause' : 'Play';
+    const btn = document.getElementById('btn-play')!;
+    btn.textContent = this.playing ? 'Pause' : 'Play';
   }
-
   private doStep(): void {
     stepInPlace(this.grid, this.scratch, this.rule, this.boundary);
     this.generation++;
@@ -376,14 +505,12 @@ export class App {
     this.voxels.sync(this.grid);
     this.syncStats();
   }
-
   private reset(): void {
     this.playing = false;
     document.getElementById('btn-play')!.textContent = 'Play';
     const id = getSeedById(this.seedId) ? this.seedId : DEFAULT_SEED_ID;
     this.plantSeed(id);
   }
-
   private plantSeed(id: string): void {
     if (!applySeed(this.grid, id)) return;
     this.seedId = id;
@@ -394,7 +521,6 @@ export class App {
     this.syncUI();
     this.toast(this.seedName);
   }
-
   private randomize(): void {
     this.grid.randomize(this.density);
     this.seedName = 'Random';
@@ -404,7 +530,6 @@ export class App {
     this.voxels.sync(this.grid);
     this.syncUI();
   }
-
   private resizeWorld(size: number): void {
     const wasPlaying = this.playing;
     this.playing = false;
@@ -417,7 +542,10 @@ export class App {
         for (let x = 0; x < old.size; x++) {
           const age = old.get(x, y, z);
           if (!age) continue;
-          this.grid.set(x - oHalf + nHalf, y - oHalf + nHalf, z - oHalf + nHalf, age);
+          const nx = x - oHalf + nHalf;
+          const ny = y - oHalf + nHalf;
+          const nz = z - oHalf + nHalf;
+          this.grid.set(nx, ny, nz, age);
         }
       }
     }
@@ -431,7 +559,6 @@ export class App {
     this.playing = wasPlaying;
     if (wasPlaying) document.getElementById('btn-play')!.textContent = 'Pause';
   }
-
   private exportJSON(): void {
     const blob = new Blob([snapshotToJSON(this.makeSnapshot())], { type: 'application/json' });
     const a = document.createElement('a');
@@ -441,7 +568,6 @@ export class App {
     URL.revokeObjectURL(a.href);
     this.toast('Exported JSON');
   }
-
   private syncUI(): void {
     document.getElementById('rule-notation')!.textContent = this.rule.notation;
     (document.getElementById('rule-custom') as HTMLInputElement).value = this.rule.notation;
@@ -455,29 +581,31 @@ export class App {
     const preset = RULE_PRESETS.find((p) => p.notation === this.rule.notation);
     const sel = document.getElementById('rule-preset') as HTMLSelectElement;
     if (preset) sel.value = preset.id;
+    const seedSel = document.getElementById('seed-select') as HTMLSelectElement;
+    if (this.seedId && getSeedById(this.seedId)) seedSel.value = this.seedId;
     this.syncStats();
   }
-
   private syncStats(): void {
     document.getElementById('stat-gen')!.textContent = String(this.generation);
     document.getElementById('stat-pop')!.textContent = String(this.grid.population);
     document.getElementById('stat-rule')!.textContent = this.rule.notation;
     document.getElementById('stat-seed')!.textContent = this.seedName;
   }
-
   private showFirstHint(): void {
     try {
       if (localStorage.getItem(HINT_KEY) === '1') {
         document.getElementById('first-hint')?.classList.add('hidden');
       }
-    } catch { /* ignore */ }
+    } catch {
+    }
   }
-
   private dismissHint(): void {
     document.getElementById('first-hint')?.classList.add('hidden');
-    try { localStorage.setItem(HINT_KEY, '1'); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(HINT_KEY, '1');
+    } catch {
+    }
   }
-
   private toast(msg: string): void {
     const el = document.getElementById('toast')!;
     el.textContent = msg;
@@ -485,7 +613,6 @@ export class App {
     window.clearTimeout(this.toastTimer);
     this.toastTimer = window.setTimeout(() => el.classList.add('hidden'), 2200);
   }
-
   private loop = (): void => {
     requestAnimationFrame(this.loop);
     const dt = this.scene.delta;
@@ -498,6 +625,7 @@ export class App {
         if (this.accum > interval * 3) this.accum = 0;
       }
     }
+    this.slice.update(dt);
     this.scene.render();
   };
 }
