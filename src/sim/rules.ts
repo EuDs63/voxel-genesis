@@ -1,5 +1,6 @@
 /**
  * B/S (Birth/Survive) rule parsing and named presets for 26-neighbor Moore CA.
+ * Presets favor sparse breathing / crystal dynamics over instant fill.
  */
 
 export interface Rule {
@@ -9,7 +10,7 @@ export interface Rule {
   survive: ReadonlySet<number>;
   /** Display name */
   name: string;
-  /** Canonical B/S notation e.g. "B4-6/S5-7" */
+  /** Canonical B/S notation e.g. "B4/S4-5" */
   notation: string;
 }
 
@@ -20,47 +21,50 @@ export interface RulePreset {
   description: string;
 }
 
-/** Named presets chosen for interesting 3D Moore dynamics (not Conway 2333). */
+/**
+ * Named presets tuned for interesting long-lived 3D Moore dynamics.
+ * Avoid broad birth ranges that flood a 24³ volume in a few generations.
+ */
 export const RULE_PRESETS: readonly RulePreset[] = [
   {
-    id: 'ember-bloom',
-    name: 'Ember Bloom',
-    notation: 'B4-6/S5-7',
-    description: 'Organic ember clusters that breathe and branch',
+    id: 'ember-breath',
+    name: 'Ember Breath',
+    notation: 'B4/S4-5',
+    description: 'Sparse embers that pulse, die back, and rekindle — rarely floods the void',
   },
   {
     id: 'crystal-veins',
     name: 'Crystal Veins',
-    notation: 'B5-6/S4-6',
-    description: 'Angular crystalline growth along lattice veins',
+    notation: 'B5/S5-6',
+    description: 'Angular crystalline filaments that etch lattice veins without packing solid',
   },
   {
     id: 'nebula-drift',
     name: 'Nebula Drift',
-    notation: 'B13/S13',
-    description: 'Soft volumetric clouds that slowly morph',
+    notation: 'B10-12/S9-14',
+    description: 'Soft volumetric mist that slowly morphs and stays sparse',
   },
   {
-    id: 'coral-reef',
-    name: 'Coral Reef',
-    notation: 'B6/S5-8,10',
-    description: 'Dense reef structures with stable cores',
+    id: 'coral-scaffold',
+    name: 'Coral Scaffold',
+    notation: 'B6/S5-7',
+    description: 'Open reef scaffolds with hollow cores — growth without instant fill',
   },
   {
-    id: 'pyroclastic',
-    name: 'Pyroclastic',
-    notation: 'B4-7/S6-8',
-    description: 'Explosive growth settling into rocky forms',
+    id: 'pyro-bloom',
+    name: 'Pyro Bloom',
+    notation: 'B5/S4-6',
+    description: 'Brief explosive flares that settle into rocky, airy forms',
   },
   {
-    id: 'amoeba',
-    name: 'Amoeba',
-    notation: 'B9/S5-7,12-13',
-    description: 'Blob-like amoebas that crawl and merge',
+    id: 'void-whisper',
+    name: 'Void Whisper',
+    notation: 'B7/S6-8',
+    description: 'Filamentary whispers — delicate and slow, almost secretive',
   },
 ] as const;
 
-export const DEFAULT_RULE_ID = 'ember-bloom';
+export const DEFAULT_RULE_ID = 'ember-breath';
 
 /**
  * Parse a count list like "4-6", "5-8,10", "13", "0-26".

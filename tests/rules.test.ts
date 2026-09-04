@@ -7,6 +7,7 @@ import {
   ruleFromPreset,
   getPresetById,
   RULE_PRESETS,
+  DEFAULT_RULE_ID,
 } from '../src/sim/rules';
 
 describe('parseCountList', () => {
@@ -24,10 +25,10 @@ describe('parseCountList', () => {
 
 describe('parseRuleNotation', () => {
   it('parses canonical B/S', () => {
-    const r = parseRuleNotation('B4-6/S5-7');
-    expect([...r.birth].sort((a, b) => a - b)).toEqual([4, 5, 6]);
-    expect([...r.survive].sort((a, b) => a - b)).toEqual([5, 6, 7]);
-    expect(r.notation).toBe('B4-6/S5-7');
+    const r = parseRuleNotation('B4/S4-5');
+    expect([...r.birth].sort((a, b) => a - b)).toEqual([4]);
+    expect([...r.survive].sort((a, b) => a - b)).toEqual([4, 5]);
+    expect(r.notation).toBe('B4/S4-5');
   });
 
   it('is case-insensitive and ignores spaces', () => {
@@ -48,12 +49,12 @@ describe('formatNotation', () => {
 });
 
 describe('shouldLive', () => {
-  const rule = parseRuleNotation('B4-6/S5-7');
+  const rule = parseRuleNotation('B4/S4-5');
   it('births and survives correctly', () => {
     expect(shouldLive(false, 4, rule)).toBe(true);
     expect(shouldLive(false, 3, rule)).toBe(false);
     expect(shouldLive(true, 5, rule)).toBe(true);
-    expect(shouldLive(true, 4, rule)).toBe(false);
+    expect(shouldLive(true, 3, rule)).toBe(false);
   });
 });
 
@@ -64,6 +65,16 @@ describe('presets', () => {
       expect(r.notation).toBe(p.notation);
       expect(r.notation).not.toBe('B3/S2-3');
     }
-    expect(getPresetById('ember-bloom')?.notation).toBe('B4-6/S5-7');
+    expect(DEFAULT_RULE_ID).toBe('ember-breath');
+    expect(getPresetById('ember-breath')?.notation).toBe('B4/S4-5');
+    expect(getPresetById('crystal-veins')?.notation).toBe('B5/S5-6');
+  });
+
+  it('favors narrow birth sets to avoid instant fill', () => {
+    for (const p of RULE_PRESETS) {
+      const r = ruleFromPreset(p);
+      // No preset should birth on more than 6 distinct neighbor counts
+      expect(r.birth.size).toBeLessThanOrEqual(6);
+    }
   });
 });
