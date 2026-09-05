@@ -1,44 +1,63 @@
-/**
- * Age-based ember → cyan color ramp for living voxels.
- */
+/** Runtime-selectable age ramps shared by living voxels and their trails. */
 
 import * as THREE from 'three';
 
-const _c = new THREE.Color();
+export type ColorPaletteId = 'ember' | 'glacier' | 'orchid';
 
-/** Map age (1-255) to cinematic ember→amber→cyan. Young stay ember longer. */
+export interface ColorPalette {
+  readonly young: number;
+  readonly mature: number;
+  readonly ancient: number;
+  readonly trail: number;
+}
+
+export const COLOR_PALETTES: Readonly<Record<ColorPaletteId, ColorPalette>> = {
+  ember: { young: 0xff4b1f, mature: 0xffb14a, ancient: 0x48dcff, trail: 0x778cff },
+  glacier: { young: 0x5b9dff, mature: 0x61f4ef, ancient: 0xe3fbff, trail: 0x668de8 },
+  orchid: { young: 0xff4f9a, mature: 0xb77aff, ancient: 0x66e8ff, trail: 0x9a70db },
+};
+
+let currentPaletteId: ColorPaletteId = 'ember';
+const _c = new THREE.Color();
+const _from = new THREE.Color();
+const _to = new THREE.Color();
+
+export function setColorPalette(id: ColorPaletteId): void {
+  currentPaletteId = id;
+}
+
+export function getColorPalette(): ColorPaletteId {
+  return currentPaletteId;
+}
+
+/** Map age (1-255) through the active young-to-ancient ramp. */
 export function ageToColor(age: number, out: THREE.Color = _c): THREE.Color {
   const t = Math.min(1, Math.max(0, (age - 1) / 55));
   const s = smooth(t);
-  // Young ember #ff5a1f → mid amber #ffb347 → old cyan #3de8ff
-  let r: number;
-  let g: number;
-  let b: number;
-  if (s < 0.45) {
-    const u = s / 0.45;
-    r = lerp(1.0, 1.0, u);
-    g = lerp(0.35, 0.70, u);
-    b = lerp(0.12, 0.28, u);
+  const palette = COLOR_PALETTES[currentPaletteId];
+  const split = 0.46;
+  if (s < split) {
+    _from.setHex(palette.young);
+    _to.setHex(palette.mature);
+    out.lerpColors(_from, _to, s / split);
   } else {
-    const u = (s - 0.45) / 0.55;
-    r = lerp(1.0, 0.24, u);
-    g = lerp(0.70, 0.91, u);
-    b = lerp(0.28, 1.0, u);
+    _from.setHex(palette.mature);
+    _to.setHex(palette.ancient);
+    out.lerpColors(_from, _to, (s - split) / (1 - split));
   }
-  const boost = age <= 3 ? 1.2 : 1.0;
-  return out.setRGB(Math.min(1, r * boost), Math.min(1, g * boost), Math.min(1, b * boost));
-}
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
+  if (age <= 2) out.multiplyScalar(age === 1 ? 1.12 : 1.05);
+  return out;
 }
 
 function smooth(t: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** Ghost trail color — cool translucent violet-cyan. */
+/** Muted ghost color derived from the active palette. */
 export function trailColor(strength: number, out: THREE.Color = _c): THREE.Color {
   const s = Math.min(1, Math.max(0, strength));
-  return out.setRGB(0.45 + 0.15 * s, 0.35 + 0.25 * s, 0.95);
+  const palette = COLOR_PALETTES[currentPaletteId];
+  _from.setHex(palette.trail);
+  _to.setHex(palette.ancient);
+  return out.lerpColors(_from, _to, 0.12 + s * 0.22);
 }

@@ -3,6 +3,7 @@ import type { Grid3D, BoundaryMode } from '../sim/grid';
 import type { Rule } from '../sim/rules';
 import type { SymmetryMode } from '../sim/symmetry';
 import type { AppSnapshot } from '../sim/share';
+import type { StepResult } from '../sim/ca';
 import type { GenesisScene } from '../render/scene';
 import type { VoxelRenderer } from '../render/voxels';
 import type { TrailRenderer } from '../render/trails';
@@ -10,6 +11,7 @@ import type { SlicePlane, SliceAxis } from '../render/slice';
 import type { CameraPresetId } from '../render/camera';
 
 export type InteractionMode = 'orbit' | 'paint';
+export type PaintTool = 'paint' | 'erase' | 'source' | 'barrier' | 'intervention-erase';
 
 /** Surface used by UI/input binders (avoids circular imports). */
 export interface AppHost {
@@ -39,11 +41,12 @@ export interface AppHost {
   brushRadius: number;
   interactionMode: InteractionMode;
   lastPaintKey: string;
+  paintTool: PaintTool;
   fillPresetSelects(): void;
   refreshLocalizedUI(): void;
   updateRuleDesc(): void;
   updateSeedDesc(): void;
-  loadSnapshot(snap: AppSnapshot): void;
+  loadSnapshot(snap: AppSnapshot, record?: boolean): void;
   makeSnapshot(): AppSnapshot;
   goCamera(id: CameraPresetId): void;
   setInteractionMode(mode: InteractionMode): void;
@@ -54,9 +57,10 @@ export interface AppHost {
   clickAxis(axis: SliceAxis): void;
   toggleSlice(): void;
   nudgeSlice(d: number): void;
-  togglePlay(): void;
-  doStep(): void;
+  togglePlay(force?: boolean): void;
+  doStep(): StepResult;
   reset(): void;
+  restoreDefaults(): void;
   plantSeed(id: string): void;
   randomize(): void;
   resizeWorld(size: number): void;
@@ -67,4 +71,23 @@ export interface AppHost {
   dismissHint(): void;
   toast(msg: string): void;
   displaySeedName(): string;
+  beginEdit(): void;
+  finishEdit(): void;
+  undo(): void;
+  redo(): void;
+  setPaintTool(tool: PaintTool): void;
+  schedulePersist(): void;
+  refreshLibrary(): void;
+  saveWork(): void;
+  setPalette(id: 'ember' | 'glacier' | 'orchid'): void;
+  toggleImmersive(force?: boolean): void;
+  saveImage(): void;
+  openCatalog(): void;
+  filterCatalog(): void;
+  startBreeding(): Promise<void>;
+  cancelBreeding(close?: boolean): void;
+  setEnvironment(id: 'aurora' | 'dawn' | 'blueprint'): void;
+  focusArtwork(): void;
+  clearInterventions(): void;
+  addCenterSource(): void;
 }

@@ -2,9 +2,20 @@ import type { AppHost } from './app-host';
 
 export function bindAppInput(app: AppHost, canvas: HTMLCanvasElement): void {
     window.addEventListener('keydown', (e) => {
+      if (document.querySelector('dialog[open]')) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.target instanceof HTMLSelectElement) return;
       const k = e.key.toLowerCase();
+      if (k === 'escape') { app.toggleImmersive(false); return; }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && k === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) app.redo(); else app.undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && k === 'y') {
+        e.preventDefault(); app.redo(); return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (k === ' ') {
         e.preventDefault();
         app.togglePlay();
@@ -32,22 +43,21 @@ export function bindAppInput(app: AppHost, canvas: HTMLCanvasElement): void {
     canvas.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       if (!app.slice.visible) return;
-      const coarse = window.matchMedia('(pointer: coarse)').matches;
-      if (coarse && app.interactionMode !== 'paint') return;
+      if (app.interactionMode !== 'paint') return;
       app.updatePointer(e, canvas);
       app.raycaster.setFromCamera(app.pointer, app.scene.camera);
       const cell = app.slice.hitToCell(app.raycaster);
       if (!cell) return;
-      if (!coarse && app.interactionMode !== 'paint' && !e.altKey) {
-      }
       e.preventDefault();
       try {
         canvas.setPointerCapture(e.pointerId);
       } catch {
       }
       app.scene.controls.enabled = false;
+      app.togglePlay(false);
+      app.beginEdit();
       app.painting = true;
-      app.paintErase = e.shiftKey;
+      app.paintErase = app.paintTool === 'erase' || e.shiftKey;
       app.lastPaintKey = '';
       app.paintAt(cell.x, cell.y, cell.z);
       app.slice.setHoverCell(cell);
@@ -77,9 +87,9 @@ export function bindAppInput(app: AppHost, canvas: HTMLCanvasElement): void {
         }
       }
       app.applyInteractionMode();
-      app.seedName = 'Painted';
-      app.seedId = '';
+      if (app.paintTool === 'paint' || app.paintTool === 'erase') { app.seedName = 'Painted'; app.seedId = ''; }
       app.syncUI();
+      app.finishEdit();
     };
     canvas.addEventListener('pointerup', endPaint);
     canvas.addEventListener('pointercancel', endPaint);

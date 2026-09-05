@@ -6,9 +6,12 @@
 import type { BoundaryMode } from './grid';
 import { Grid3D } from './grid';
 import { parseRuleNotation, type Rule } from './rules';
+import type { ColorPaletteId } from '../render/colors';
+import { validateInterventionIndices } from './interventions';
+import type { EnvironmentId } from '../render/environments';
 
 export interface AppSnapshot {
-  v: 1;
+  v: 1 | 2;
   size: number;
   generation: number;
   rule: string;
@@ -19,6 +22,16 @@ export interface AppSnapshot {
   density?: number;
   speed?: number;
   playing?: boolean;
+  seedId?: string;
+  sliceAxis?: 'x' | 'y' | 'z';
+  sliceIndex?: number;
+  sliceVisible?: boolean;
+  /** Serialized v2 snapshot of this experiment's restart point (never nested). */
+  restart?: string;
+  palette?: ColorPaletteId;
+  environment?: EnvironmentId;
+  sources?: number[];
+  barriers?: number[];
 }
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -38,6 +51,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 function base64ToBytes(b64: string): Uint8Array {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(b64) || b64.length % 4 === 1) throw new Error('Invalid base64');
   const clean = b64.replace(/=+$/, '');
   const out: number[] = [];
   for (let i = 0; i < clean.length; i += 4) {
@@ -59,6 +73,7 @@ export function btoaUrl(str: string): string {
 }
 
 export function atobUrl(str: string): string {
+  if (!/^[A-Za-z0-9_-]*$/.test(str) || str.length % 4 === 1) throw new Error('Invalid base64url');
   const pad = str.length % 4 === 0 ? '' : '='.repeat(4 - (str.length % 4));
   const b64 = str.replace(/-/g, '+').replace(/_/g, '/') + pad;
   return new TextDecoder().decode(base64ToBytes(b64));
@@ -91,9 +106,11 @@ export function decodeCells(encoded: string, grid: Grid3D): void {
     const y = Number(bits[1]);
     const z = Number(bits[2]);
     const age = Number(bits[3] ?? 1);
-    if ([x, y, z, age].every((n) => Number.isFinite(n))) {
-      grid.set(x, y, z, age);
+    if (![x, y, z, age].every(Number.isInteger) || age < 1 || age > 255 ||
+        x < 0 || y < 0 || z < 0 || x >= grid.size || y >= grid.size || z >= grid.size) {
+      throw new Error('Invalid cell data');
     }
+    grid.set(x, y, z, age);
   }
 }
 
@@ -102,9 +119,30 @@ export function snapshotToJSON(snap: AppSnapshot): string {
 }
 
 export function parseSnapshotJSON(json: string): AppSnapshot {
+  if (json.length > 2_000_000) throw new Error('Snapshot too large');
   const data = JSON.parse(json) as AppSnapshot;
-  if (!data || data.v !== 1 || typeof data.size !== 'number' || typeof data.rule !== 'string') {
+  if (!data || (data.v !== 1 && data.v !== 2) || !Number.isInteger(data.size) ||
+      data.size < 4 || data.size > 64 || typeof data.rule !== 'string' ||
+      typeof data.cells !== 'string' || !Number.isInteger(data.generation) || data.generation < 0 ||
+      (data.boundary !== 'clamp' && data.boundary !== 'wrap') ||
+      (data.density != null && (!Number.isFinite(data.density) || data.density < 0 || data.density > 1)) ||
+      (data.speed != null && (!Number.isFinite(data.speed) || data.speed < 0.5 || data.speed > 60)) ||
+      (data.seedName != null && (typeof data.seedName !== 'string' || data.seedName.length > 80)) ||
+      (data.seedId != null && (typeof data.seedId !== 'string' || data.seedId.length > 80)) ||
+      (data.playing != null && typeof data.playing !== 'boolean') ||
+      (data.sliceVisible != null && typeof data.sliceVisible !== 'boolean') ||
+      (data.palette != null && !['ember', 'glacier', 'orchid'].includes(data.palette)) ||
+      (data.environment != null && !['aurora', 'dawn', 'blueprint'].includes(data.environment)) ||
+      (data.sliceAxis != null && !['x', 'y', 'z'].includes(data.sliceAxis)) ||
+      (data.sliceIndex != null && (!Number.isInteger(data.sliceIndex) || data.sliceIndex < 0 || data.sliceIndex >= data.size))) {
     throw new Error('Invalid snapshot');
+  }
+  applySnapshot(data);
+  validateInterventionIndices(data.size, data.sources, data.barriers);
+  if (data.restart != null) {
+    if (typeof data.restart !== 'string' || data.restart.length > 2_000_000) throw new Error('Invalid restart state');
+    const restart = parseSnapshotJSON(data.restart);
+    if (restart.restart != null) throw new Error('Nested restart state');
   }
   return data;
 }
@@ -127,13 +165,13 @@ export function applySnapshot(
 export function writeHash(snap: AppSnapshot): void {
   if (typeof location === 'undefined' || typeof history === 'undefined') return;
   const hash = btoaUrl(snapshotToJSON(snap));
-  history.replaceState(null, '', `${location.pathname}${location.search}#v1.${hash}`);
+  history.replaceState(null, '', `${location.pathname}${location.search}#v${snap.v}.${hash}`);
 }
 
 export function readHash(): AppSnapshot | null {
   if (typeof location === 'undefined') return null;
   const hash = location.hash.replace(/^#/, '');
-  if (!hash.startsWith('v1.')) return null;
+  if (!hash.startsWith('v1.') && !hash.startsWith('v2.')) return null;
   try {
     return parseSnapshotJSON(atobUrl(hash.slice(3)));
   } catch {

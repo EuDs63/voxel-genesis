@@ -12,11 +12,12 @@ import {
   t,
   onLocaleChange,
   syncLangToggle,
-  ruleNameKey,
+  getLocale,
   symmetryKey,
   type Locale,
 } from '../i18n';
 import type { AppHost } from './app-host';
+import { ruleConditionLabel } from '../sim/rule-explanation';
 
 export function bindAppUI(app: AppHost): void {
     const $ = (id: string) => document.getElementById(id)!;
@@ -41,6 +42,9 @@ export function bindAppUI(app: AppHost): void {
     $('btn-play').onclick = () => app.togglePlay();
     $('btn-step').onclick = () => app.doStep();
     $('btn-reset').onclick = () => app.reset();
+    $('btn-defaults').onclick = () => app.restoreDefaults();
+    $('btn-undo').onclick = () => app.undo();
+    $('btn-redo').onclick = () => app.redo();
     $('btn-rand').onclick = () => app.randomize();
     $('btn-seed').onclick = () => {
       app.plantSeed(seedSel.value);
@@ -50,20 +54,26 @@ export function bindAppUI(app: AppHost): void {
     presetSel.onchange = () => {
       const p = getPresetById(presetSel.value);
       if (!p) return;
-      app.rule = ruleFromPreset(p);
+      app.beginEdit(); app.rule = ruleFromPreset(p);
       ($('rule-custom') as HTMLInputElement).value = p.notation;
       app.syncUI();
-      app.toast(t(ruleNameKey(p.id)));
+      app.toast(ruleConditionLabel(app.rule, getLocale()));
+      app.finishEdit();
     };
     $('btn-apply-rule').onclick = () => {
       const raw = ($('rule-custom') as HTMLInputElement).value;
       try {
-        app.rule = parseRuleNotation(raw, t('rule.custom'));
-        presetSel.value = '';
+        const parsed = parseRuleNotation(raw, t('rule.custom'));
+        $('rule-error').textContent = '';
+        app.beginEdit();
+        app.rule = parsed;
+        presetSel.value = 'custom';
         app.syncUI();
         app.toast(t('toast.rule', { notation: app.rule.notation }));
+        app.finishEdit();
       } catch (e) {
-        app.toast(e instanceof Error ? e.message : t('toast.invalidRule'));
+        $('rule-error').textContent = t('rules.invalidHelp');
+        app.toast(t('toast.invalidRule'));
       }
     };
     const speed = $('speed') as HTMLInputElement;
@@ -84,7 +94,9 @@ export function bindAppUI(app: AppHost): void {
       $('density-val').textContent = app.density.toFixed(2);
     };
     ($('boundary') as HTMLSelectElement).onchange = (e) => {
+      app.beginEdit();
       app.boundary = (e.target as HTMLSelectElement).value as BoundaryMode;
+      app.finishEdit();
     };
     const slice = $('slice') as HTMLInputElement;
     slice.oninput = () => {
@@ -153,12 +165,53 @@ export function bindAppUI(app: AppHost): void {
     $('btn-panel').onclick = () => {
       $('panel').classList.toggle('collapsed');
     };
+    $('btn-panel-close').onclick = () => $('panel').classList.add('collapsed');
     $('btn-dismiss-hint').onclick = () => app.dismissHint();
     $('btn-mode-orbit').onclick = () => app.setInteractionMode('orbit');
     $('btn-mode-paint').onclick = () => app.setInteractionMode('paint');
+    $('btn-tool-paint').onclick = () => app.setPaintTool('paint');
+    $('btn-tool-erase').onclick = () => app.setPaintTool('erase');
+    $('btn-tool-source').onclick = () => { app.setInteractionMode('paint'); app.setPaintTool('source'); };
+    $('btn-tool-barrier').onclick = () => { app.setInteractionMode('paint'); app.setPaintTool('barrier'); };
+    $('btn-tool-intervention-erase').onclick = () => { app.setInteractionMode('paint'); app.setPaintTool('intervention-erase'); };
+    $('btn-clear-interventions').onclick = () => app.clearInterventions();
+    $('btn-center-source').onclick = () => app.addCenterSource();
     $('btn-mode-fab').onclick = () => {
       app.setInteractionMode(app.interactionMode === 'paint' ? 'orbit' : 'paint');
     };
+    document.querySelectorAll<HTMLButtonElement>('[data-palette]').forEach((button) => {
+      button.onclick = () => app.setPalette(button.dataset.palette as 'ember' | 'glacier' | 'orchid');
+    });
+    $('btn-immersive').onclick = () => app.toggleImmersive(true);
+    $('btn-exit-immersive').onclick = () => app.toggleImmersive(false);
+    $('btn-image').onclick = () => app.saveImage();
+    $('btn-open-catalog').onclick = () => app.openCatalog();
+    $('btn-open-catalog-create').onclick = () => app.openCatalog();
+    $('btn-focus').onclick = () => app.focusArtwork();
+    $('btn-breed').onclick = () => { void app.startBreeding(); };
+    $('btn-cancel-breeding').onclick = () => app.cancelBreeding(true);
+    ($('breeding-dialog') as HTMLDialogElement).oncancel=(event)=>{ event.preventDefault(); app.cancelBreeding(true); };
+    document.querySelectorAll<HTMLButtonElement>('[data-environment]').forEach(button=>button.onclick=()=>app.setEnvironment(button.dataset.environment as 'aurora'|'dawn'|'blueprint'));
+    document.querySelectorAll<HTMLButtonElement>('[data-dialog-close]').forEach(button=>button.onclick=()=>{ const dialog=button.closest('dialog') as HTMLDialogElement; if(dialog.id==='breeding-dialog')app.cancelBreeding(true);else dialog.close(); });
+    ($('catalog-search') as HTMLInputElement).oninput=()=>app.filterCatalog();
+    document.querySelectorAll<HTMLButtonElement>('#catalog-filters [data-category]').forEach(button=>button.onclick=()=>{document.querySelectorAll('#catalog-filters [data-category]').forEach(el=>el.classList.toggle('active',el===button));app.filterCatalog();});
     presetSel.addEventListener('change', () => app.updateRuleDesc());
+    $('btn-save-work').onclick = () => app.saveWork();
+    document.querySelectorAll<HTMLButtonElement>('.tab').forEach((tab) => {
+      tab.onclick = () => {
+        document.querySelectorAll('.tab').forEach((el) => el.classList.toggle('active', el === tab));
+        document.querySelectorAll<HTMLElement>('.tab').forEach((el) => { el.setAttribute('aria-selected', el === tab ? 'true' : 'false'); el.tabIndex = el === tab ? 0 : -1; });
+        document.querySelectorAll<HTMLElement>('.tab-content').forEach((el) => {
+          el.hidden = el.dataset.tab !== tab.dataset.tab;
+        });
+      };
+      tab.onkeydown = (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault(); const tabs = [...document.querySelectorAll<HTMLButtonElement>('.tab')];
+        const delta = event.key === 'ArrowRight' ? 1 : -1; const next = tabs[(tabs.indexOf(tab) + delta + tabs.length) % tabs.length]!;
+        next.click(); next.focus();
+      };
+    });
+    app.refreshLibrary();
     app.updateRuleDesc();
   }

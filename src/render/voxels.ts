@@ -11,17 +11,20 @@ export class VoxelRenderer {
   private readonly dummy = new THREE.Object3D();
   private readonly color = new THREE.Color();
   private readonly geometry: THREE.BoxGeometry;
-  private readonly material: THREE.MeshBasicMaterial;
+  private readonly material: THREE.MeshStandardMaterial;
   private readonly capacity: number;
 
   constructor(maxInstances: number, cellGap = 0.18) {
     this.capacity = Math.max(1, maxInstances);
     this.geometry = new THREE.BoxGeometry(1 - cellGap, 1 - cellGap, 1 - cellGap);
-    // Unlit + bloom = vivid ember/cyan in the void (StandardMaterial washed out under dim lights)
-    this.material = new THREE.MeshBasicMaterial({
+    // A low emissive floor preserves saturation while lighting gives each cube
+    // readable bright, midtone, and shadow faces.
+    this.material = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      transparent: true,
-      opacity: 0.92,
+      roughness: 0.48,
+      metalness: 0.08,
+      emissive: 0x211511,
+      emissiveIntensity: 0.18,
       toneMapped: true,
     });
     this.mesh = new THREE.InstancedMesh(this.geometry, this.material, this.capacity);

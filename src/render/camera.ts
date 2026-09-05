@@ -78,6 +78,12 @@ export class CameraDirector {
     return this.active;
   }
 
+  /** Stop an in-flight preset transition when direct framing takes control. */
+  cancel(): void {
+    this.active = false;
+    this.onComplete = null;
+  }
+
   goTo(
     camera: THREE.PerspectiveCamera,
     controls: OrbitControls,

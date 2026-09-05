@@ -34,68 +34,118 @@
         </div>
       </header>
 
+      <div class="transport-bar" aria-label="Playback controls">
+        <button type="button" id="btn-play" class="primary" title="Space" data-i18n="btn.play">Play</button>
+        <button type="button" id="btn-step" title="N" data-i18n="btn.step">Step</button>
+        <button type="button" id="btn-reset" title="R" data-i18n="btn.reset">Restart</button>
+        <label class="speed-compact"><span data-i18n="transport.speed">Speed</span> <span id="speed-val">8</span>
+          <input type="range" id="speed" min="1" max="30" value="8" aria-label="Speed" />
+        </label>
+      </div>
+
       <aside class="panel" id="panel">
-        <section>
-          <h2 data-i18n="section.transport">Transport</h2>
-          <div class="row">
-            <button type="button" id="btn-play" class="primary" title="Space" data-i18n="btn.play">Play</button>
-            <button type="button" id="btn-step" title="N" data-i18n="btn.step">Step</button>
-            <button type="button" id="btn-reset" title="R" data-i18n="btn.reset">Reset</button>
-            <button type="button" id="btn-rand" title="G" data-i18n="btn.random">Random</button>
-          </div>
-          <label class="slider-label"><span data-i18n="transport.speed">Speed</span> <span id="speed-val">8</span> <span data-i18n="transport.genPerSec">gen/s</span></label>
-          <input type="range" id="speed" min="1" max="30" value="8" />
+        <div class="panel-heading"><strong data-i18n="panel.title">Studio controls</strong><button id="btn-panel-close" type="button" data-i18n-aria="panel.close" aria-label="Close panel">×</button></div>
+        <div class="tabs" role="tablist" aria-label="Tasks">
+          <button class="tab active" role="tab" tabindex="0" data-tab="watch" aria-selected="true" data-i18n="tab.watch">Watch</button>
+          <button class="tab" role="tab" tabindex="-1" data-tab="create" aria-selected="false" data-i18n="tab.create">Create</button>
+          <button class="tab" role="tab" tabindex="-1" data-tab="experiment" aria-selected="false" data-i18n="tab.experiment">Experiment</button>
+        </div>
+
+        <section class="tab-content featured" data-tab="watch">
+          <h2 data-i18n="section.featured">Featured scenes</h2>
+          <p class="hint-text" data-i18n="featured.help">Choose a setup, then press Play. This replaces the current world and can be undone.</p>
+          <div id="featured-scenes" class="featured-scenes"></div>
+          <div class="studio-actions"><button id="btn-open-catalog" class="primary" type="button" data-i18n="btn.catalog">Browse shape catalog</button><button id="btn-focus" type="button" data-i18n="btn.focus">Focus artwork</button></div>
         </section>
 
-        <section>
+        <section class="tab-content" data-tab="watch">
+          <h2 data-i18n="section.environment">Environment</h2>
+          <div class="environment-cards">
+            <button type="button" data-environment="aurora"><i></i><span data-i18n="environment.aurora">Aurora</span></button>
+            <button type="button" data-environment="dawn"><i></i><span data-i18n="environment.dawn">Warm horizon</span></button>
+            <button type="button" data-environment="blueprint"><i></i><span data-i18n="environment.blueprint">Blue grid</span></button>
+          </div>
+        </section>
+
+        <section class="tab-content observation" data-tab="watch">
+          <div class="observation-head"><h2 data-i18n="section.trend">Live cells</h2><span id="play-state" class="state-pill"></span></div>
+          <svg class="trend-chart" viewBox="0 0 260 56" role="img" data-i18n-aria="trend.aria"><path id="trend-path" d="" /></svg>
+          <p id="step-delta" class="hint-text"></p>
+          <p id="trend-empty" class="hint-text hidden" data-i18n="trend.empty">No live cells. Choose a featured scene to start again.</p>
+        </section>
+
+        <section class="tab-content" data-tab="experiment" hidden>
           <h2 data-i18n="section.world">World</h2>
-          <label><span data-i18n="world.size">Size</span> <span id="size-val">24</span>³</label>
+          <label for="size"><span data-i18n="world.size">Size</span> <span id="size-val">24</span>³</label>
           <input type="range" id="size" min="12" max="40" value="24" step="2" />
-          <label><span data-i18n="world.density">Density</span> <span id="density-val">0.08</span></label>
+          <label for="density"><span data-i18n="world.density">Density</span> <span id="density-val">0.08</span></label>
           <input type="range" id="density" min="0.02" max="0.35" value="0.08" step="0.01" />
-          <label data-i18n="world.boundary">Boundary</label>
+          <p class="hint-text" data-i18n="world.densityHint">Density only affects the next random initialization.</p>
+          <label for="boundary" data-i18n="world.boundary">Boundary</label>
           <select id="boundary">
             <option value="clamp" data-i18n="boundary.clamp">Clamp (void edge)</option>
             <option value="wrap" data-i18n="boundary.wrap">Wrap (torus)</option>
           </select>
         </section>
 
-        <section>
+        <section class="tab-content" data-tab="experiment" hidden>
           <h2 data-i18n="section.rules">Rules</h2>
-          <select id="rule-preset"></select>
-          <p class="hint-text" id="rule-desc"></p>
-          <label data-i18n="rules.customBS">Custom B/S</label>
-          <div class="row">
-            <input type="text" id="rule-custom" placeholder="B4/S4-5" spellcheck="false" />
-            <button type="button" id="btn-apply-rule" data-i18n="btn.apply">Apply</button>
-          </div>
-          <p class="mono" id="rule-notation">B4/S4-5</p>
+          <p class="hint-text" data-i18n="rules.guide">Each cell has at most 26 neighbors. The numbers are how many of them are alive. One step updates every cell together from the previous state.</p>
+          <select id="rule-preset" data-i18n-aria="section.rules"></select>
+          <p class="rule-line" id="rule-empty"></p>
+          <p class="rule-line" id="rule-live"></p>
+          <details class="advanced-rule">
+            <summary data-i18n="rules.advanced">Advanced: custom rule</summary>
+            <p class="hint-text" data-i18n="rules.syntax">B means birth; S means survive. A dash includes both endpoints.</p>
+            <label for="rule-custom" data-i18n="rules.customBS">Rule code (B/S)</label>
+            <div class="row">
+              <input type="text" id="rule-custom" placeholder="B4/S4-5" spellcheck="false" aria-describedby="rule-error" />
+              <button type="button" id="btn-apply-rule" data-i18n="btn.apply">Apply rule</button>
+            </div>
+            <p class="form-error" id="rule-error" role="status" aria-live="polite"></p>
+            <p class="mono"><span data-i18n="rules.code">Rule code:</span> <span id="rule-notation">B4/S4-5</span></p>
+          </details>
         </section>
 
-        <section>
+        <section class="tab-content" data-tab="create" hidden>
           <h2 data-i18n="section.seeds">Seeds</h2>
-          <select id="seed-select"></select>
+          <select id="seed-select" data-i18n-aria="section.seeds"></select>
           <p class="hint-text" id="seed-desc"></p>
           <button type="button" id="btn-seed" class="wide" data-i18n="btn.plantSeed">Plant Seed</button>
+          <div class="row"><button type="button" id="btn-rand" title="G" data-i18n="btn.random">Random</button><button type="button" id="btn-defaults" data-i18n="btn.defaults">Restore defaults</button></div>
+          <div class="studio-actions"><button id="btn-open-catalog-create" class="primary" type="button" data-i18n="btn.catalog">Browse shape catalog</button><button id="btn-breed" type="button" data-i18n="btn.breed">Breed variants</button></div>
         </section>
 
-        <section>
+        <section class="tab-content" data-tab="create" hidden>
           <h2 data-i18n="section.paint">Paint Slice</h2>
           <div class="row mode-toggle">
             <button type="button" id="btn-mode-orbit" class="mode-btn active" data-i18n="btn.orbit">Orbit</button>
             <button type="button" id="btn-mode-paint" class="mode-btn" data-i18n="btn.paint">Paint</button>
           </div>
+          <div class="row mode-toggle">
+            <button type="button" id="btn-tool-paint" class="mode-btn active" data-i18n="btn.paintTool">Draw</button>
+            <button type="button" id="btn-tool-erase" class="mode-btn" data-i18n="btn.erase">Erase</button>
+            <button type="button" id="btn-undo" data-i18n="btn.undo">Undo</button>
+            <button type="button" id="btn-redo" data-i18n="btn.redo">Redo</button>
+          </div>
+          <div class="row mode-toggle intervention-tools">
+            <button type="button" id="btn-tool-source" class="mode-btn" data-i18n="btn.source">Growth source</button>
+            <button type="button" id="btn-tool-barrier" class="mode-btn" data-i18n="btn.barrier">No-growth zone</button>
+            <button type="button" id="btn-tool-intervention-erase" class="mode-btn" data-i18n="btn.clearMark">Remove mark</button>
+          </div>
+          <p class="hint-text" data-i18n="intervention.help">Manual intervention: cyan sources stay alive; red no-growth cells stay empty.</p>
+          <div class="row"><button id="btn-center-source" type="button" data-i18n="btn.centerSource">Add center source</button><button id="btn-clear-interventions" type="button" data-i18n="btn.clearInterventions">Clear interventions</button></div>
           <div class="row">
             <button type="button" id="axis-x" class="axis">X</button>
             <button type="button" id="axis-y" class="axis active">Y</button>
             <button type="button" id="axis-z" class="axis">Z</button>
             <button type="button" id="btn-slice-toggle" title="P" data-i18n="btn.hide">Hide</button>
           </div>
-          <label><span data-i18n="paint.plane">Plane</span> <span id="slice-val">12</span></label>
+          <label for="slice"><span data-i18n="paint.plane">Plane</span> <span id="slice-val">12</span></label>
           <input type="range" id="slice" min="0" max="23" value="12" />
-          <label><span data-i18n="paint.brush">Brush</span> <span id="brush-val">1</span>³</label>
+          <label for="brush"><span data-i18n="paint.brush">Brush</span> <span id="brush-val">1</span>³</label>
           <input type="range" id="brush" min="0" max="3" value="0" step="1" />
-          <label data-i18n="paint.symmetry">Symmetry</label>
+          <label for="symmetry" data-i18n="paint.symmetry">Symmetry</label>
           <select id="symmetry"></select>
           <p class="hint-text">
             <span data-i18n="paint.hint.before">Hover shows snap-to-grid highlight · Shift erase · cell</span>
@@ -103,22 +153,30 @@
           </p>
         </section>
 
-        <section>
+        <section class="tab-content" data-tab="watch">
           <h2 data-i18n="section.camera">Camera</h2>
           <div class="row wrap" id="camera-presets"></div>
           <p class="hint-text" data-i18n="camera.hint">Keys 1–5 · respects reduced motion</p>
         </section>
 
-        <section>
+        <section class="tab-content" data-tab="watch">
           <h2 data-i18n="section.view">View</h2>
           <div class="row wrap">
             <button type="button" id="btn-orbit" class="toggle on" data-i18n="btn.autoOrbit">Auto-orbit</button>
             <button type="button" id="btn-trails" class="toggle on" data-i18n="btn.trails">Time trails</button>
             <button type="button" id="btn-bloom" class="toggle on" data-i18n="btn.bloom">Bloom</button>
           </div>
+          <h3 data-i18n="view.palette">Color theme</h3>
+          <div class="row palette-row">
+            <button type="button" data-palette="ember" data-i18n="palette.ember">Orange + cyan</button>
+            <button type="button" data-palette="glacier" data-i18n="palette.glacier">Ice blue</button>
+            <button type="button" data-palette="orchid" data-i18n="palette.orchid">Purple + pink</button>
+          </div>
+          <div class="color-legend"><span data-i18n="palette.newborn">Newborn</span><i></i><span data-i18n="palette.older">Lives longer</span></div>
+          <div class="row"><button id="btn-immersive" type="button" data-i18n="btn.immersive">Immersive view</button><button id="btn-image" type="button" data-i18n="btn.image">Save image</button></div>
         </section>
 
-        <section>
+        <section class="tab-content" data-tab="create" hidden>
           <h2 data-i18n="section.share">Share</h2>
           <div class="row">
             <button type="button" id="btn-export" data-i18n="btn.export">Export JSON</button>
@@ -128,7 +186,13 @@
           <input type="file" id="import-file" accept="application/json,.json" hidden />
         </section>
 
-        <section class="shortcuts">
+        <section class="tab-content" data-tab="create" hidden>
+          <h2 data-i18n="section.library">Works</h2>
+          <div class="row"><input id="work-name" type="text" maxlength="48" data-i18n-placeholder="library.name" placeholder="Work name" /><button id="btn-save-work" data-i18n="btn.save">Save</button></div>
+          <div id="works-list" class="works-list"></div>
+        </section>
+
+        <section class="shortcuts tab-content" data-tab="experiment" hidden>
           <h2 data-i18n="section.keys">Keys</h2>
           <ul>
             <li><kbd>Space</kbd> <span data-i18n="keys.playPause">play/pause</span></li>
@@ -146,8 +210,22 @@
 
       <button type="button" id="btn-panel" class="fab" data-i18n-title="btn.panelTitle" title="Toggle panel">☰</button>
       <button type="button" id="btn-mode-fab" class="fab fab-mode" data-i18n-title="mode.fabOrbit" title="Orbit mode (tap for Paint)">🕹</button>
+      <button type="button" id="btn-exit-immersive" class="exit-immersive" data-i18n="btn.exitImmersive">Exit immersive</button>
 
       <div id="toast" class="toast hidden"></div>
+
+      <dialog id="catalog-dialog" class="workspace-dialog">
+        <header><div><h2 data-i18n="catalog.title">Shape catalog</h2><p data-i18n="catalog.help">Choose a real cell structure. Replacing the current shape can be undone.</p></div><button type="button" data-dialog-close aria-label="Close dialog" data-i18n-aria="dialog.close">×</button></header>
+        <div class="catalog-tools"><input id="catalog-search" type="search" data-i18n-placeholder="catalog.search" placeholder="Search shapes" /><div id="catalog-filters" class="filter-row"><button data-category="all" class="active" data-i18n="category.all">All</button><button data-category="geometry" data-i18n="category.geometry">Geometry</button><button data-category="surface" data-i18n="category.surface">Surfaces</button><button data-category="fractal" data-i18n="category.fractal">Fractals</button><button data-category="organic" data-i18n="category.organic">Organic</button></div></div>
+        <div id="catalog-grid" class="catalog-grid"></div>
+        <p id="catalog-empty" class="catalog-empty hidden" data-i18n="catalog.empty">No matching shapes.</p>
+      </dialog>
+
+      <dialog id="breeding-dialog" class="workspace-dialog breeding-dialog">
+        <header><div><h2 data-i18n="breeding.title">Shape breeding</h2><p data-i18n="breeding.help">Variants of the current shape. The 24-step preview excludes manual interventions; choosing one clears interventions and can be undone. Continued growth is not guaranteed.</p></div><button type="button" data-dialog-close aria-label="Close dialog" data-i18n-aria="dialog.close">×</button></header>
+        <div class="breeding-status"><span id="breeding-progress" role="status"></span><button id="btn-cancel-breeding" type="button" data-i18n="btn.returnArtwork">Return to artwork</button></div>
+        <div id="breeding-grid" class="catalog-grid breeding-grid"></div>
+      </dialog>
 
       <div id="first-hint" class="first-hint">
         <div class="first-hint-card">

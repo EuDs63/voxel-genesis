@@ -27,7 +27,7 @@ export class SlicePlane {
     const mat = new THREE.MeshBasicMaterial({
       color: 0x3de0ff,
       transparent: true,
-      opacity: 0.08,
+      opacity: 0.052,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
@@ -36,7 +36,7 @@ export class SlicePlane {
     const edges = new THREE.EdgesGeometry(geo);
     this.helper = new THREE.LineSegments(
       edges,
-      new THREE.LineBasicMaterial({ color: 0x3de0ff, transparent: true, opacity: 0.55 }),
+      new THREE.LineBasicMaterial({ color: 0x57dff5, transparent: true, opacity: 0.38 }),
     );
 
     // Unit cube highlight — scaled to brush footprint
@@ -46,7 +46,7 @@ export class SlicePlane {
       new THREE.MeshBasicMaterial({
         color: 0xff6b2d,
         transparent: true,
-        opacity: 0.35,
+        opacity: 0.28,
         depthWrite: false,
         side: THREE.DoubleSide,
       }),
@@ -61,7 +61,7 @@ export class SlicePlane {
     crossGeo.setAttribute('position', new THREE.BufferAttribute(crossPositions, 3));
     this.hoverCross = new THREE.LineSegments(
       crossGeo,
-      new THREE.LineBasicMaterial({ color: 0xff6b2d, transparent: true, opacity: 0.9 }),
+      new THREE.LineBasicMaterial({ color: 0xff8a45, transparent: true, opacity: 0.82 }),
     );
     this.hoverCross.visible = false;
 
@@ -114,7 +114,7 @@ export class SlicePlane {
     if (this.paintFlash > 0) {
       this.paintFlash = Math.max(0, this.paintFlash - dt);
       const mat = this.hoverMesh.material as THREE.MeshBasicMaterial;
-      mat.opacity = 0.35 + (this.paintFlash / 0.22) * 0.45;
+      mat.opacity = 0.28 + (this.paintFlash / 0.22) * 0.42;
       mat.color.setHex(this.paintFlash > 0 ? 0xffaa44 : 0xff6b2d);
     }
   }
