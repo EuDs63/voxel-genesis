@@ -164,6 +164,78 @@ html, body {
   padding: .45rem; border: 1px solid var(--panel-border); border-radius: 10px;
   background: var(--panel); backdrop-filter: blur(14px);
 }
+.universe-nav {
+  position: absolute;
+  z-index: 5;
+  left: 1rem;
+  bottom: calc(5.45rem + var(--safe-bottom));
+  display: flex;
+  align-items: stretch;
+  gap: .45rem;
+  pointer-events: auto;
+}
+.universe-depth {
+  min-width: 88px;
+  padding: .5rem .7rem;
+  border: 1px solid rgba(61,224,255,.22);
+  border-radius: 10px;
+  background: rgba(5,12,24,.78);
+  box-shadow: 0 0 24px rgba(61,224,255,.08);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+}
+.universe-depth span {
+  color: var(--muted);
+  font-size: .66rem;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+.universe-depth strong {
+  margin-top: .12rem;
+  color: var(--cyan);
+  font-family: var(--display);
+  font-size: .86rem;
+  letter-spacing: .08em;
+}
+.universe-nav button { background: rgba(5,12,24,.86); }
+.universe-hint {
+  position: absolute;
+  z-index: 4;
+  top: 5.35rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  max-width: min(90vw, 430px);
+  padding: .42rem .68rem;
+  border: 1px solid rgba(61,224,255,.13);
+  border-radius: 999px;
+  background: rgba(5,12,24,.62);
+  color: rgba(232,238,248,.72);
+  font-size: .76rem;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+}
+.universe-hint-mark {
+  color: var(--cyan);
+  text-shadow: 0 0 12px rgba(61,224,255,.65);
+  animation: universe-pulse 2.2s ease-in-out infinite;
+}
+body.universe-deep .universe-depth {
+  border-color: rgba(255,107,45,.36);
+  box-shadow: 0 0 30px rgba(255,107,45,.12);
+}
+body.universe-deep .universe-depth strong { color: var(--ember); }
+body.universe-transitioning #c { cursor: zoom-in; }
+button:disabled { cursor: default; opacity: .45; box-shadow: none; }
+@keyframes universe-pulse {
+  0%, 100% { opacity: .45; transform: scale(.88); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
 .speed-compact { display: flex; align-items: center; gap: .35rem; font-size: .72rem; color: var(--muted); }
 .speed-compact input { width: 92px; }
 .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; position: sticky; top: 0; z-index: 2; padding-bottom: .75rem; background: rgba(10,12,20,.96); }
@@ -189,6 +261,24 @@ html, body {
   border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 .panel section:last-child { border-bottom: none; margin-bottom: 0; }
+.universe-panel {
+  padding: .7rem;
+  border: 1px solid rgba(61,224,255,.13) !important;
+  border-radius: 9px;
+  background: linear-gradient(145deg, rgba(61,224,255,.055), rgba(255,107,45,.035));
+}
+.universe-panel-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
+.universe-panel-head h2 { margin-bottom: 0; }
+.depth-chip {
+  flex: none;
+  padding: .22rem .42rem;
+  border-radius: 999px;
+  background: rgba(61,224,255,.08);
+  color: var(--muted);
+  font-size: .68rem;
+}
+.depth-chip strong { color: var(--cyan); font-family: var(--display); font-size: .7rem; }
+.universe-panel .hint-text { margin-bottom: .2rem; }
 
 .panel label, .slider-label {
   display: block;
@@ -480,6 +570,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .exit-immersive { display:none; position:absolute; z-index:30; right:1rem; top:1rem; background:rgba(7,15,28,.9); }
 body.immersive .topbar, body.immersive .panel, body.immersive .transport-bar, body.immersive .fab { display:none !important; }
 body.immersive .exit-immersive { display:block; }
+body.immersive .universe-hint { display: none; }
 
 @media (max-width:720px) {
   .panel { top:auto; left:0; right:0; bottom:5.2rem; width:100%; max-height:min(42vh,380px); padding-bottom:calc(1rem + var(--safe-bottom)); border-radius:14px 14px 0 0; }
@@ -489,6 +580,9 @@ body.immersive .exit-immersive { display:block; }
   .fab-mode { width:auto; min-width:92px; padding:0 .8rem; border-radius:24px; }
   #btn-panel { left:1rem; right:auto; top:auto; bottom:calc(5.35rem + var(--safe-bottom)); }
   #btn-mode-fab { left:auto; right:1rem; top:auto; bottom:calc(5.35rem + var(--safe-bottom)); }
+  .universe-nav { left: .65rem; bottom: calc(5.35rem + var(--safe-bottom)); }
+  .universe-depth { min-width: 74px; padding: .42rem .55rem; }
+  .universe-hint { top: 7.3rem; width: max-content; font-size: .7rem; }
 }
 
 .studio-actions { display:flex; gap:.45rem; margin-top:.65rem; }

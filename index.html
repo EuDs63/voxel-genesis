@@ -43,6 +43,18 @@
         </label>
       </div>
 
+      <div class="universe-nav" id="universe-nav" aria-live="polite">
+        <div class="universe-depth">
+          <span data-i18n="universe.depth">Depth</span>
+          <strong data-universe-depth>Root</strong>
+        </div>
+        <button type="button" id="btn-universe-ascend" data-universe-ascend data-i18n="universe.return" hidden>Return upward</button>
+      </div>
+      <div class="universe-hint" id="universe-hint">
+        <span class="universe-hint-mark" aria-hidden="true">◎</span>
+        <span id="universe-hint-text" data-i18n="universe.hintRoot">Double-click a living voxel to enter it</span>
+      </div>
+
       <aside class="panel" id="panel">
         <div class="panel-heading"><strong data-i18n="panel.title">Studio controls</strong><button id="btn-panel-close" type="button" data-i18n-aria="panel.close" aria-label="Close panel">×</button></div>
         <div class="tabs" role="tablist" aria-label="Tasks">
@@ -56,6 +68,15 @@
           <p class="hint-text" data-i18n="featured.help">Choose a setup, then press Play. This replaces the current world and can be undone.</p>
           <div id="featured-scenes" class="featured-scenes"></div>
           <div class="studio-actions"><button id="btn-open-catalog" class="primary" type="button" data-i18n="btn.catalog">Browse shape catalog</button><button id="btn-focus" type="button" data-i18n="btn.focus">Focus artwork</button></div>
+        </section>
+
+        <section class="tab-content universe-panel" data-tab="watch">
+          <div class="universe-panel-head">
+            <h2 data-i18n="section.universe">Recursive exploration</h2>
+            <span class="depth-chip"><span data-i18n="universe.depth">Depth</span> <strong data-universe-depth>Root</strong></span>
+          </div>
+          <p class="hint-text" data-i18n="universe.help">Double-click any living voxel to enter the world nested inside it. The same address always returns to the same place.</p>
+          <button type="button" id="btn-universe-ascend-panel" class="wide" data-universe-ascend data-i18n="universe.return" hidden>Return upward</button>
         </section>
 
         <section class="tab-content" data-tab="watch">
@@ -203,6 +224,7 @@
             <li><kbd>X</kbd> <kbd>Y</kbd> <kbd>Z</kbd> <span data-i18n="keys.planeAxis">plane axis</span></li>
             <li><kbd>1</kbd>–<kbd>5</kbd> <span data-i18n="keys.cameraPresets">camera presets</span></li>
             <li><kbd>O</kbd> <span data-i18n="keys.orbitTrails">auto-orbit · trails</span> · <kbd>T</kbd></li>
+            <li><kbd>U</kbd> <span data-i18n="keys.ascend">return one universe upward</span></li>
             <li><kbd>?</kbd> <span data-i18n="keys.togglePanel">toggle this panel</span></li>
           </ul>
         </section>
@@ -240,6 +262,7 @@
             <strong data-i18n="mode.paint">Paint</strong>
             <span data-i18n="hint.p2b">mode for snap-to-grid aiming on the slice. Camera presets 1–5 for cinematic framing.</span>
           </p>
+          <p class="hint-text" data-i18n="hint.p3">In Orbit mode, double-click a living voxel to dive into the world inside it.</p>
           <button type="button" id="btn-dismiss-hint" class="primary wide" data-i18n="btn.dismissHint">Enter Voxel Genesis</button>
         </div>
       </div>

@@ -1,6 +1,9 @@
 import type { AppHost } from './app-host';
 
 export function bindAppInput(app: AppHost, canvas: HTMLCanvasElement): void {
+    let touchStart: { x: number; y: number } | null = null;
+    let lastTouchTap: { x: number; y: number; at: number } | null = null;
+    let suppressDblClickUntil = 0;
     window.addEventListener('keydown', (e) => {
       if (document.querySelector('dialog[open]')) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -22,6 +25,7 @@ export function bindAppInput(app: AppHost, canvas: HTMLCanvasElement): void {
       } else if (k === 'n') app.doStep();
       else if (k === 'r') app.reset();
       else if (k === 'g') app.randomize();
+      else if (k === 'u') app.ascendUniverse();
       else if (k === 'p') app.toggleSlice();
       else if (k === '[') app.nudgeSlice(-1);
       else if (k === ']') app.nudgeSlice(1);
@@ -42,8 +46,11 @@ export function bindAppInput(app: AppHost, canvas: HTMLCanvasElement): void {
     });
     canvas.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
+      if (app.interactionMode === 'orbit') {
+        if (e.pointerType === 'touch') touchStart = { x: e.clientX, y: e.clientY };
+        return;
+      }
       if (!app.slice.visible) return;
-      if (app.interactionMode !== 'paint') return;
       app.updatePointer(e, canvas);
       app.raycaster.setFromCamera(app.pointer, app.scene.camera);
       const cell = app.slice.hitToCell(app.raycaster);
@@ -91,10 +98,35 @@ export function bindAppInput(app: AppHost, canvas: HTMLCanvasElement): void {
       app.syncUI();
       app.finishEdit();
     };
-    canvas.addEventListener('pointerup', endPaint);
-    canvas.addEventListener('pointercancel', endPaint);
+    canvas.addEventListener('pointerup', (event) => {
+      endPaint(event);
+      if (app.interactionMode !== 'orbit' || event.pointerType !== 'touch' || !touchStart) return;
+      const moved = Math.hypot(event.clientX - touchStart.x, event.clientY - touchStart.y);
+      touchStart = null;
+      if (moved > 12) { lastTouchTap = null; return; }
+      const now = performance.now();
+      if (lastTouchTap && now - lastTouchTap.at < 420 &&
+          Math.hypot(event.clientX - lastTouchTap.x, event.clientY - lastTouchTap.y) < 24) {
+        lastTouchTap = null;
+        if (app.diveAtPointer(event, canvas)) {
+          suppressDblClickUntil = now + 500;
+          event.preventDefault();
+        }
+      } else {
+        lastTouchTap = { x: event.clientX, y: event.clientY, at: now };
+      }
+    });
+    canvas.addEventListener('pointercancel', (event) => {
+      touchStart = null;
+      lastTouchTap = null;
+      endPaint(event);
+    });
     canvas.addEventListener('pointerleave', () => {
       if (!app.painting) app.slice.clearHover();
+    });
+    canvas.addEventListener('dblclick', (event) => {
+      if (performance.now() < suppressDblClickUntil) return;
+      if (app.diveAtPointer(event, canvas)) event.preventDefault();
     });
   }
 
@@ -111,5 +143,6 @@ export function runAppLoop(app: AppHost): void {
     }
   }
   app.slice.update(dt);
+  app.updateUniverseTransition(dt);
   app.scene.render();
 }

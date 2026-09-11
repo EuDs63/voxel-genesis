@@ -46,12 +46,16 @@ export interface AppHost {
   refreshLocalizedUI(): void;
   updateRuleDesc(): void;
   updateSeedDesc(): void;
-  loadSnapshot(snap: AppSnapshot, record?: boolean): void;
+  loadSnapshot(snap: AppSnapshot, record?: boolean, preserveUniverse?: boolean): void;
   makeSnapshot(): AppSnapshot;
   goCamera(id: CameraPresetId): void;
   setInteractionMode(mode: InteractionMode): void;
   applyInteractionMode(): void;
   updatePointer(e: PointerEvent, canvas: HTMLCanvasElement): void;
+  diveAtPointer(e: PointerEvent | MouseEvent, canvas: HTMLCanvasElement): boolean;
+  ascendUniverse(): boolean;
+  updateUniverseTransition(dt: number): void;
+  syncUniverseUI(): void;
   paintAt(x: number, y: number, z: number): void;
   updatePaintCoordHud(x: number, y: number, z: number): void;
   clickAxis(axis: SliceAxis): void;

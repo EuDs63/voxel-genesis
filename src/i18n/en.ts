@@ -25,6 +25,7 @@ export const en = {
   'section.library': 'Works',
   'section.featured': 'Featured scenes',
   'section.trend': 'Live-cell trend',
+  'section.universe': 'Recursive exploration',
   'panel.title': 'Studio controls',
   'panel.close': 'Close controls',
   'dialog.close': 'Close dialog',
@@ -84,6 +85,12 @@ export const en = {
   'paint.symmetry': 'Symmetry',
   'paint.hint.before': 'Hover shows snap-to-grid highlight · Shift erase · cell',
   'camera.hint': 'Keys 1–5 · respects reduced motion',
+  'universe.depth': 'Depth',
+  'universe.root': 'Root',
+  'universe.return': 'Return upward',
+  'universe.help': 'Double-click any living voxel to enter the world nested inside it. The same address always returns to the same place.',
+  'universe.hintRoot': 'Double-click a living voxel to enter it',
+  'universe.hintDeep': 'Double-click another voxel to go deeper · U returns upward',
 
   'mode.orbit': 'Orbit',
   'mode.paint': 'Paint',
@@ -99,6 +106,7 @@ export const en = {
   'hint.p2a': 'Switch to',
   'hint.p2b':
     'mode to add or erase cells on a drawing plane. Camera presets 1–5 change the view.',
+  'hint.p3': 'In Orbit mode, double-click a living voxel to dive into the world inside it.',
 
   'keys.playPause': 'play/pause',
   'keys.stepResetRandom': 'step · reset · random',
@@ -108,6 +116,7 @@ export const en = {
   'keys.planeAxis': 'plane axis',
   'keys.cameraPresets': 'camera presets',
   'keys.orbitTrails': 'auto-orbit · trails',
+  'keys.ascend': 'return one universe upward',
   'keys.togglePanel': 'toggle this panel',
 
   'toast.loadedShared': 'Loaded shared state',
@@ -125,6 +134,9 @@ export const en = {
   'toast.workSaved': 'Work saved',
   'toast.imageSaved': 'Image saved',
   'toast.imageFailed': 'Could not save image',
+  'toast.universeDive': 'Entered depth −{depth}',
+  'toast.universeAscend': 'Returned to depth −{depth}',
+  'toast.universeRoot': 'Returned to the root universe',
   'library.name': 'Work name',
   'library.confirmDelete': 'Delete this saved work?',
   'featured.help': 'Choose a setup, then press Play. Replaces the current world; Undo restores it.',

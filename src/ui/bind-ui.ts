@@ -188,6 +188,8 @@ export function bindAppUI(app: AppHost): void {
     $('btn-open-catalog').onclick = () => app.openCatalog();
     $('btn-open-catalog-create').onclick = () => app.openCatalog();
     $('btn-focus').onclick = () => app.focusArtwork();
+    $('btn-universe-ascend').onclick = () => app.ascendUniverse();
+    $('btn-universe-ascend-panel').onclick = () => app.ascendUniverse();
     $('btn-breed').onclick = () => { void app.startBreeding(); };
     $('btn-cancel-breeding').onclick = () => app.cancelBreeding(true);
     ($('breeding-dialog') as HTMLDialogElement).oncancel=(event)=>{ event.preventDefault(); app.cancelBreeding(true); };

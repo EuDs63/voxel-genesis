@@ -52,9 +52,35 @@ import { Interventions, validateInterventionIndices, type InterventionKind } fro
 import { InterventionRenderer } from './render/interventions';
 import type { EnvironmentId } from './render/environments';
 import { createMutations, evaluateMutationAsync, type MutationCandidate } from './sim/breeding';
+import {
+  generateChildUniverse,
+  seedUniverseRoot,
+  universeAddressKey,
+  type UniverseAddressStep,
+} from './sim/universe';
 const HINT_KEY = 'voxel-genesis-hint-dismissed';
 export type InteractionMode = 'orbit' | 'paint';
 export type PaintTool = 'paint' | 'erase' | 'intervention-erase' | InterventionKind;
+
+interface UniverseLevelMemory {
+  snapshot: AppSnapshot;
+  cameraPosition: [number, number, number];
+  cameraTarget: [number, number, number];
+}
+
+interface UniverseTransition {
+  outgoing: VoxelRenderer;
+  incoming: VoxelRenderer;
+  elapsed: number;
+  duration: number;
+  direction: 'in' | 'out';
+  anchor: THREE.Vector3;
+  cameraFrom: THREE.Vector3;
+  cameraTo: THREE.Vector3;
+  targetFrom: THREE.Vector3;
+  targetTo: THREE.Vector3;
+}
+
 export class App {
   public scene: GenesisScene;
   public voxels: VoxelRenderer;
@@ -96,6 +122,11 @@ export class App {
   public environment: EnvironmentId = 'aurora';
   private breedingController: AbortController | null = null;
   private mutationCandidates = new Map<string, MutationCandidate>();
+  private universeSeed: number | null = null;
+  private universePath: UniverseAddressStep[] = [];
+  private universeAncestors: UniverseLevelMemory[] = [];
+  private universeCache = new Map<string, UniverseLevelMemory>();
+  private universeTransition: UniverseTransition | null = null;
   constructor(canvas: HTMLCanvasElement) {
     initLocale();
     this.reducedMotion = prefersReducedMotion();
@@ -223,6 +254,7 @@ export class App {
     this.renderFeaturedScenes();
     this.renderTrend();
     this.setPalette(this.palette, false);
+    this.syncUniverseUI();
   }
   public updateRuleDesc(): void {
     const explanation = ruleExplanation(this.rule, getLocale());
@@ -266,7 +298,9 @@ export class App {
       return true;
     } catch { return false; }
   }
-  public loadSnapshot(snap: AppSnapshot, record = true): void {
+  public loadSnapshot(snap: AppSnapshot, record = true, preserveUniverse = false): void {
+    this.finishUniverseTransition();
+    if (!preserveUniverse) this.resetUniverseNavigation();
     this.cancelBreeding(true);
     if (record && this.initialSnapshot) this.history.push(this.makeSnapshot());
     const applied = applySnapshot(snap);
@@ -398,6 +432,252 @@ export class App {
     this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   }
+
+  private captureUniverseLevel(): UniverseLevelMemory {
+    return {
+      snapshot: { ...this.makeSnapshot(), playing: false },
+      cameraPosition: this.scene.camera.position.toArray() as [number, number, number],
+      cameraTarget: this.scene.controls.target.toArray() as [number, number, number],
+    };
+  }
+
+  private resetUniverseNavigation(): void {
+    this.universeSeed = null;
+    this.universePath = [];
+    this.universeAncestors = [];
+    if (this.universeCache) this.universeCache.clear();
+    else this.universeCache = new Map<string, UniverseLevelMemory>();
+    this.syncUniverseUI();
+  }
+
+  public get universeDepth(): number {
+    return this.universePath?.length ?? 0;
+  }
+
+  public diveAtPointer(e: PointerEvent | MouseEvent, canvas: HTMLCanvasElement): boolean {
+    if (this.interactionMode !== 'orbit' || this.universeTransition) return false;
+    this.updatePointer(e as PointerEvent, canvas);
+    this.raycaster.setFromCamera(this.pointer, this.scene.camera);
+    const hit = this.raycaster.intersectObject(this.voxels.mesh, false)[0];
+    if (hit?.instanceId == null) return false;
+    const cell = this.voxels.cellAtInstance(hit.instanceId);
+    return cell ? this.diveIntoCell(cell.x, cell.y, cell.z) : false;
+  }
+
+  public diveIntoCell(x: number, y: number, z: number): boolean {
+    if (this.universeTransition || !this.grid.inBounds(x, y, z)) return false;
+    const age = this.grid.get(x, y, z);
+    if (age === 0) return false;
+    this.togglePlay(false);
+    if (this.universeSeed == null) {
+      this.universeSeed = seedUniverseRoot(this.grid, this.generation, this.rule.notation);
+    }
+
+    const parent = this.captureUniverseLevel();
+    this.universeCache.set(universeAddressKey(this.universePath), parent);
+    const step: UniverseAddressStep = { x, y, z, generation: this.generation, age };
+    const nextPath = [...this.universePath, step];
+    const nextKey = universeAddressKey(nextPath);
+    let child = this.universeCache.get(nextKey);
+    if (!child) {
+      const generated = generateChildUniverse(this.grid.size, this.universeSeed, nextPath);
+      child = {
+        snapshot: {
+          ...parent.snapshot,
+          generation: 0,
+          seedName: `Depth ${nextPath.length}`,
+          seedId: generated.seedId,
+          cells: encodeCells(generated.grid),
+          playing: false,
+          sources: [],
+          barriers: [],
+          restart: undefined,
+        },
+        cameraPosition: [...parent.cameraPosition],
+        cameraTarget: [...parent.cameraTarget],
+      };
+      this.universeCache.set(nextKey, child);
+    }
+
+    this.universeAncestors.push(parent);
+    this.universePath = nextPath;
+    this.applyUniverseLevel(child, 'in', step);
+    this.toast(t('toast.universeDive', { depth: this.universeDepth }));
+    return true;
+  }
+
+  public ascendUniverse(): boolean {
+    if (this.universeTransition || this.universePath.length === 0) return false;
+    this.togglePlay(false);
+    this.universeCache.set(universeAddressKey(this.universePath), this.captureUniverseLevel());
+    const focus = this.universePath[this.universePath.length - 1]!;
+    const parent = this.universeAncestors.pop();
+    if (!parent) return false;
+    this.universePath = this.universePath.slice(0, -1);
+    this.applyUniverseLevel(parent, 'out', focus);
+    this.toast(this.universeDepth === 0
+      ? t('toast.universeRoot')
+      : t('toast.universeAscend', { depth: this.universeDepth }));
+    return true;
+  }
+
+  private applyUniverseLevel(
+    memory: UniverseLevelMemory,
+    direction: 'in' | 'out',
+    focus: UniverseAddressStep,
+  ): void {
+    const outgoing = this.voxels;
+    const outgoingSize = this.grid.size;
+    const applied = applySnapshot(memory.snapshot);
+    const size = applied.grid.size;
+    this.grid = applied.grid;
+    this.scratch = new Grid3D(size);
+    this.rule = applied.rule;
+    this.generation = applied.generation;
+    this.boundary = applied.boundary;
+    this.seedName = applied.seedName;
+    this.seedId = memory.snapshot.seedId || '';
+    if (memory.snapshot.density != null) this.density = memory.snapshot.density;
+    if (memory.snapshot.speed != null) this.speed = memory.snapshot.speed;
+    this.environment = memory.snapshot.environment ?? 'aurora';
+    this.scene.setEnvironment(this.environment);
+    this.playing = false;
+
+    this.slice.setGridSize(size);
+    this.slice.setIndex(memory.snapshot.sliceIndex ?? Math.floor(size / 2));
+    if (memory.snapshot.sliceAxis) this.slice.setAxis(memory.snapshot.sliceAxis);
+    this.paintSliceVisible = memory.snapshot.sliceVisible ?? true;
+    this.slice.setVisible(this.interactionMode === 'paint' && this.paintSliceVisible);
+    this.scene.updateBounds(size);
+
+    const incoming = new VoxelRenderer(size ** 3);
+    incoming.sync(this.grid);
+    this.voxels = incoming;
+    this.scene.root.add(incoming.mesh);
+    if (memory.snapshot.palette) this.setPalette(memory.snapshot.palette, false);
+
+    this.scene.root.remove(this.interventionRenderer.group);
+    this.interventionRenderer.dispose();
+    this.interventions = new Interventions(size);
+    const marks = validateInterventionIndices(size, memory.snapshot.sources, memory.snapshot.barriers);
+    this.interventions.load(marks.sources, marks.barriers);
+    this.interventionRenderer = new InterventionRenderer(size ** 3);
+    this.interventionRenderer.sync(this.interventions);
+    this.scene.root.add(this.interventionRenderer.group);
+
+    this.trails.clear();
+    this.resetTrend();
+    if (memory.snapshot.restart) this.initialSnapshot = parseSnapshotJSON(memory.snapshot.restart);
+    else this.initialSnapshot = { ...memory.snapshot, playing: false, restart: undefined };
+    this.syncUI();
+    this.schedulePersist();
+
+    const anchorSize = direction === 'in' ? outgoingSize : size;
+    const half = (anchorSize - 1) / 2;
+    const anchor = new THREE.Vector3(focus.x - half, focus.y - half, focus.z - half);
+    const cameraFrom = this.scene.camera.position.clone();
+    const targetFrom = this.scene.controls.target.clone();
+    const cameraTo = new THREE.Vector3(...memory.cameraPosition);
+    const targetTo = new THREE.Vector3(...memory.cameraTarget);
+
+    if (this.reducedMotion) {
+      this.scene.root.remove(outgoing.mesh);
+      outgoing.dispose();
+      incoming.resetTransform();
+      this.scene.camera.position.copy(cameraTo);
+      this.scene.controls.target.copy(targetTo);
+      this.scene.controls.update();
+      this.applyInteractionMode();
+      return;
+    }
+
+    incoming.setOpacity(0);
+    if (direction === 'in') {
+      incoming.mesh.scale.setScalar(0.16);
+      incoming.mesh.position.copy(anchor);
+    } else {
+      incoming.mesh.scale.setScalar(4);
+      incoming.mesh.position.copy(anchor).multiplyScalar(-3);
+    }
+    document.body.classList.add('universe-transitioning');
+    this.scene.controls.enabled = false;
+    this.universeTransition = {
+      outgoing,
+      incoming,
+      elapsed: 0,
+      duration: 0.78,
+      direction,
+      anchor,
+      cameraFrom,
+      cameraTo,
+      targetFrom,
+      targetTo,
+    };
+  }
+
+  public updateUniverseTransition(dt: number): void {
+    const transition = this.universeTransition;
+    if (!transition) return;
+    transition.elapsed += Math.min(dt, 0.05);
+    const raw = Math.min(1, transition.elapsed / transition.duration);
+    const p = raw * raw * (3 - 2 * raw);
+    const { outgoing, incoming, anchor } = transition;
+
+    if (transition.direction === 'in') {
+      const outgoingScale = 1 + p * 4.4;
+      outgoing.mesh.scale.setScalar(outgoingScale);
+      outgoing.mesh.position.copy(anchor).multiplyScalar(1 - outgoingScale);
+      outgoing.setOpacity(1 - p);
+      const incomingScale = 0.16 + p * 0.84;
+      incoming.mesh.scale.setScalar(incomingScale);
+      incoming.mesh.position.copy(anchor).multiplyScalar(1 - p);
+      incoming.setOpacity(p);
+    } else {
+      const outgoingScale = 1 - p * 0.82;
+      outgoing.mesh.scale.setScalar(outgoingScale);
+      outgoing.mesh.position.copy(anchor).multiplyScalar(p);
+      outgoing.setOpacity(1 - p);
+      const incomingScale = 4 - p * 3;
+      incoming.mesh.scale.setScalar(incomingScale);
+      incoming.mesh.position.copy(anchor).multiplyScalar(1 - incomingScale);
+      incoming.setOpacity(p);
+    }
+
+    this.scene.camera.position.lerpVectors(transition.cameraFrom, transition.cameraTo, p);
+    this.scene.controls.target.lerpVectors(transition.targetFrom, transition.targetTo, p);
+    this.scene.camera.updateMatrixWorld();
+    if (raw >= 1) this.finishUniverseTransition();
+  }
+
+  private finishUniverseTransition(): void {
+    const transition = this.universeTransition;
+    if (!transition) return;
+    this.scene.root.remove(transition.outgoing.mesh);
+    transition.outgoing.dispose();
+    transition.incoming.resetTransform();
+    this.scene.camera.position.copy(transition.cameraTo);
+    this.scene.controls.target.copy(transition.targetTo);
+    this.scene.controls.update();
+    this.universeTransition = null;
+    document.body.classList.remove('universe-transitioning');
+    this.applyInteractionMode();
+  }
+
+  public syncUniverseUI(): void {
+    if (typeof document === 'undefined') return;
+    const depth = this.universeDepth;
+    const depthLabel = depth === 0 ? t('universe.root') : `−${depth}`;
+    document.querySelectorAll<HTMLElement>('[data-universe-depth]').forEach((el) => {
+      el.textContent = depthLabel;
+    });
+    document.querySelectorAll<HTMLButtonElement>('[data-universe-ascend]').forEach((button) => {
+      button.disabled = depth === 0;
+      button.hidden = depth === 0;
+    });
+    document.body.classList.toggle('universe-deep', depth > 0);
+    const hint = document.getElementById('universe-hint-text');
+    if (hint) hint.textContent = depth === 0 ? t('universe.hintRoot') : t('universe.hintDeep');
+  }
   public paintAt(x: number, y: number, z: number): void {
     const key = `${x},${y},${z},${this.paintErase ? 0 : 1},${this.brushRadius},${this.symmetry}`;
     if (key === this.lastPaintKey) return;
@@ -434,11 +714,11 @@ export class App {
   }
   public undo(): void {
     const snap = this.history.undo(this.makeSnapshot());
-    if (snap) this.loadSnapshot(snap, false);
+    if (snap) this.loadSnapshot(snap, false, true);
   }
   public redo(): void {
     const snap = this.history.redo(this.makeSnapshot());
-    if (snap) this.loadSnapshot(snap, false);
+    if (snap) this.loadSnapshot(snap, false, true);
   }
   public setPaintTool(tool: PaintTool): void { this.paintTool = tool; this.applyInteractionMode(); }
   public updatePaintCoordHud(x: number, y: number, z: number): void {
@@ -471,6 +751,9 @@ export class App {
     if (!this.playing) this.persistNow();
   }
   public doStep(): StepResult {
+    if (this.universeTransition) {
+      return { births: 0, deaths: 0, population: this.grid.population };
+    }
     const before = this.grid.cells.slice();
     this.interventions.apply(this.grid);
     stepInPlace(this.grid, this.scratch, this.rule, this.boundary);
@@ -489,7 +772,7 @@ export class App {
     return result;
   }
   public reset(): void {
-    this.loadSnapshot(this.initialSnapshot);
+    this.loadSnapshot(this.initialSnapshot, true, true);
     this.toast(t('toast.restarted'));
   }
   public restoreDefaults(): void {
@@ -623,6 +906,7 @@ export class App {
     this.applyInteractionMode();
     const state = document.getElementById('play-state');
     if (state) { state.textContent = this.playing ? t('state.running') : t('state.paused'); state.classList.toggle('running', this.playing); }
+    this.syncUniverseUI();
   }
   public syncStats(): void {
     document.getElementById('stat-gen')!.textContent = String(this.generation);

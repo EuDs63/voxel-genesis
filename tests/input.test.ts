@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { bindAppInput } from '../src/ui/bind-input';
 
-function pointer(type: string) {
+function pointer(type: string, pointerType = 'mouse') {
   const event = new MouseEvent(type, { button: 0, clientX: 5, clientY: 5, bubbles: true });
   Object.defineProperty(event, 'pointerId', { value: 1 });
+  Object.defineProperty(event, 'pointerType', { value: pointerType });
   return event;
 }
 
@@ -11,15 +12,16 @@ function host(mode: 'orbit' | 'paint', tool: 'paint' | 'erase' = 'paint') {
   const paintAt = vi.fn();
   const beginEdit = vi.fn();
   const finishEdit = vi.fn();
+  const diveAtPointer = vi.fn(() => true);
   const app = {
     interactionMode: mode, paintTool: tool, painting: false, paintErase: false, lastPaintKey: '', playing: true,
     slice: { visible: true, hitToCell: () => ({ x: 1, y: 2, z: 3 }), setHoverCell: vi.fn(), flashPaint: vi.fn(), clearHover: vi.fn() },
     scene: { camera: {}, controls: { enabled: true } }, pointer: {}, raycaster: { setFromCamera: vi.fn() },
     updatePointer: vi.fn(), paintAt, beginEdit, finishEdit, togglePlay: vi.fn(), applyInteractionMode: vi.fn(), syncUI: vi.fn(),
-    setInteractionMode: vi.fn(), undo: vi.fn(), redo: vi.fn(), doStep: vi.fn(), reset: vi.fn(), randomize: vi.fn(), toggleSlice: vi.fn(), nudgeSlice: vi.fn(), clickAxis: vi.fn(), goCamera: vi.fn(),
+    setInteractionMode: vi.fn(), undo: vi.fn(), redo: vi.fn(), doStep: vi.fn(), reset: vi.fn(), randomize: vi.fn(), toggleSlice: vi.fn(), nudgeSlice: vi.fn(), clickAxis: vi.fn(), goCamera: vi.fn(), ascendUniverse: vi.fn(), diveAtPointer,
     seedName: '', seedId: '',
   };
-  return { app, paintAt, beginEdit, finishEdit };
+  return { app, paintAt, beginEdit, finishEdit, diveAtPointer };
 }
 
 describe('canvas input modes', () => {
@@ -44,5 +46,16 @@ describe('canvas input modes', () => {
     expect(test.paintAt).toHaveBeenCalledTimes(1);
     canvas.dispatchEvent(pointer('pointerup'));
     expect(test.finishEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('a stationary double tap dives once in orbit mode', () => {
+    const canvas = document.createElement('canvas');
+    const test = host('orbit');
+    bindAppInput(test.app as never, canvas);
+    canvas.dispatchEvent(pointer('pointerdown', 'touch'));
+    canvas.dispatchEvent(pointer('pointerup', 'touch'));
+    canvas.dispatchEvent(pointer('pointerdown', 'touch'));
+    canvas.dispatchEvent(pointer('pointerup', 'touch'));
+    expect(test.diveAtPointer).toHaveBeenCalledTimes(1);
   });
 });

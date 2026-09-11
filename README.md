@@ -21,6 +21,7 @@ In Paint mode, hover shows snap-to-grid highlight and crosshair; choose Draw or 
 Brush size and symmetry (Mirror X/Y/Z / multi-axis) live in the panel.
 Camera presets 1–5: Orbit, Hero, Top-down, Close-up, Flyby (smooth lerp; instant if reduced motion).
 O auto-orbit. T time trails. Question-mark toggles the side panel.
+In Orbit mode, double-click a live voxel (double-tap on touch) to enter its recursively generated child world. U or Return upward goes back one level. Visited worlds and their camera positions are cached for exact backtracking during the session.
 Share via Copy URL (hash state) or JSON export/import.
 Restart restores the initial world of the current experiment, including a random or hand-painted world. Changing the rule or boundary establishes that current world and setting as the new experiment start. Restore defaults returns to the built-in seed and rule. Rule, boundary, resize, seed, random, import, and complete paint strokes can be undone; simulation frames are not recorded. Imports and page-refresh session restores always open paused.
 
@@ -47,9 +48,11 @@ Crystal Seed, Ember Ring, Void Mandala, Breathing Lattice.
 
 Time-trail ghosts: fading translucent voxels of recent generations.
 
+Recursive exploration: every live voxel is a deterministic address for another 3D cellular world. Child worlds are generated lazily, and only the two adjacent levels are rendered during a transition.
+
 ## Architecture
 
-`src/sim` — grid, neighbors, rules, CA step, seeds, symmetry, share (unit-tested)
+`src/sim` — grid, neighbors, rules, CA step, seeds, recursive universe addresses, symmetry, share (unit-tested)
 `src/render` — InstancedMesh voxels, trails, slice plane + hover, camera presets, bloom/fog
 `src/app.ts` — orchestration and HUD bindings
 `tests/` — neighbor count, wrap/clamp, rule parse, seeds, symmetry, deterministic step
