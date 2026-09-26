@@ -51,6 +51,35 @@ function trefoilKnot(grid: Grid3D): void {
     setAge(grid,Math.round(cx+s*(Math.sin(t)+2*Math.sin(2*t))),Math.round(cy+s*(Math.cos(t)-2*Math.cos(2*t))),Math.round(cz-s*Math.sin(3*t)));
   }
 }
+
+/** A solid (2, 3) torus knot, swept as a tube instead of a one-cell line. */
+function torusKnot(grid: Grid3D): void {
+  const c = (grid.size - 1) / 2;
+  const major = grid.size * 0.22, minor = grid.size * 0.095;
+  const tube = Math.max(0.7, grid.size * 0.057);
+  const tubeSquared = tube * tube;
+  // Present the three openings to the hero camera while retaining genuine depth.
+  const yaw = Math.PI / 3, cosYaw = Math.cos(yaw), sinYaw = Math.sin(yaw);
+  const samples = Math.max(240, grid.size * 24);
+  for (let i = 0; i < samples; i++) {
+    const t = i / samples * Math.PI * 2;
+    const radius = major + minor * Math.cos(3 * t);
+    const px = radius * Math.sin(2 * t), py = radius * Math.cos(2 * t);
+    const pz = minor * Math.sin(3 * t);
+    const x = c + px * cosYaw + pz * sinYaw;
+    const y = c + py;
+    const z = c - px * sinYaw + pz * cosYaw;
+    for (let iz = Math.ceil(z - tube); iz <= Math.floor(z + tube); iz++) {
+      for (let iy = Math.ceil(y - tube); iy <= Math.floor(y + tube); iy++) {
+        for (let ix = Math.ceil(x - tube); ix <= Math.floor(x + tube); ix++) {
+          if ((ix - x) ** 2 + (iy - y) ** 2 + (iz - z) ** 2 <= tubeSquared) {
+            setAge(grid, ix, iy, iz);
+          }
+        }
+      }
+    }
+  }
+}
 function waveSheet(grid: Grid3D): void {
   const [cx,cy,cz]=center(grid), r=Math.max(3,Math.floor(grid.size*.3));
   for(let x=-r;x<=r;x++) for(let z=-r;z<=r;z++) setAge(grid,cx+x,Math.round(cy+Math.sin(x*.7)*2+Math.cos(z*.65)*2),cz+z);
@@ -278,6 +307,7 @@ export const SEEDS: readonly SeedDefinition[] = [
   { id:'triple-rings', name:'Triple Rings', description:'Three perpendicular great-circle rings', category:'geometry', apply:tripleRings },
   { id:'ring-chain', name:'Ring Chain', description:'Three interlinked rings on alternating planes', category:'geometry', apply:ringChain },
   { id:'trefoil-knot', name:'Trefoil Knot', description:'A closed curve wound into a three-lobed knot', category:'geometry', apply:trefoilKnot },
+  { id:'torus-knot', name:'Continuum', description:'A thick continuous ribbon woven through three interlocking loops', category:'geometry', apply:torusKnot },
   { id:'wave-sheet', name:'Wave Sheet', description:'A rippling height-field surface', category:'surface', apply:waveSheet },
   { id:'gyroid-patch', name:'Gyroid Patch', description:'A triply periodic saddle-like surface patch', category:'surface', apply:gyroidPatch },
   { id:'menger-frame', name:'Menger Frame', description:'A recursively perforated cubic frame', category:'fractal', apply:mengerFrame },

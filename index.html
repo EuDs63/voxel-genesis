@@ -4,35 +4,65 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Voxel Genesis — cinematic 3D cellular automaton" />
-    <meta name="theme-color" content="#050508" />
+    <meta name="theme-color" content="#f4f7fb" />
     <title>Voxel Genesis</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body>
     <div id="app">
-      <canvas id="c" class="mode-orbit"></canvas>
+      <canvas id="c" class="mode-orbit" aria-label="Interactive three-dimensional cellular sculpture"></canvas>
+      <div class="stage-vignette" aria-hidden="true"></div>
+      <div class="type-backdrop" aria-hidden="true">GENESIS</div>
 
       <header class="topbar">
         <div class="brand">
-          <span class="brand-mark">◈</span>
+          <svg class="brand-mark" viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M20 3 35 12v16L20 37 5 28V12Z M5 12l15 9 15-9M20 21v16M12.5 7.5l15 9v16M27.5 7.5l-15 9v16M5 20l15 9 15-9" stroke="currentColor" stroke-width="1.3"/></svg>
           <div>
             <h1>Voxel Genesis</h1>
             <p class="tagline" data-i18n="brand.tagline">Life in the void</p>
           </div>
+        </div>
+        <nav class="workspace-nav" aria-label="Workspace">
+          <button type="button" class="workspace-link active" data-workspace="watch" aria-current="page"><span class="nav-index">01</span><span data-i18n="tab.watch">Observe</span></button>
+          <button type="button" class="workspace-link" data-workspace="create"><span class="nav-index">02</span><span data-i18n="tab.create">Create</span></button>
+          <button type="button" class="workspace-link" data-workspace="experiment"><span class="nav-index">03</span><span data-i18n="tab.experiment">Experiment</span></button>
+        </nav>
+        <div class="header-actions"><button id="btn-open-studio" type="button" class="studio-button" aria-controls="panel" aria-expanded="false" data-i18n-aria="gallery.studio" aria-label="Studio"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14M7 3v4m6 1v4m-6 1v4" stroke="currentColor" stroke-width="1.3"/></svg><span data-i18n="gallery.studio">Studio</span></button>
           <div class="lang-toggle" id="lang-toggle" role="group" data-i18n-aria="lang.aria">
             <button type="button" class="lang-btn" data-locale="zh" aria-pressed="false">中文</button>
             <button type="button" class="lang-btn" data-locale="en" aria-pressed="false">EN</button>
           </div>
+          <button type="button" id="btn-gallery-image" class="capture-button" data-i18n-aria="gallery.capture" aria-label="Capture"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 6h3l1-2h6l1 2h3v10H3Z" stroke="currentColor"/><circle cx="10" cy="10.5" r="3" stroke="currentColor"/></svg><span data-i18n="gallery.capture">Capture</span></button>
         </div>
-        <div class="hud-stats" id="hud-stats">
+        <div class="hud-stats" id="hud-stats" hidden>
           <div class="stat"><span class="label" data-i18n="stat.gen">Gen</span><span id="stat-gen">0</span></div>
           <div class="stat"><span class="label" data-i18n="stat.pop">Pop</span><span id="stat-pop">0</span></div>
           <div class="stat"><span class="label" data-i18n="stat.rule">Rule</span><span id="stat-rule">—</span></div>
           <div class="stat"><span class="label" data-i18n="stat.seed">Seed</span><span id="stat-seed">—</span></div>
         </div>
       </header>
+
+      <main class="gallery-story">
+        <div class="eyebrow"><span class="status-dot"></span><span data-i18n="gallery.eyebrow">A NEW STATE OF MATTER</span></div>
+        <h2 class="exhibition-title">Beyond<br><em>matter.</em><span class="title-orbit" aria-hidden="true">✳</span></h2>
+        <p class="exhibition-intro" data-i18n="gallery.intro">A single cell. An infinite possibility.</p>
+        <div class="hero-actions">
+          <button type="button" id="btn-stage-play" class="primary"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6Z" fill="currentColor"/></svg><span data-stage-play-label data-i18n="gallery.start">Bring it to life</span></button>
+          <button type="button" id="btn-explode" class="explode-button" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m10 2 7 4-7 4-7-4 7-4ZM3 10l7 4 7-4M3 14l7 4 7-4" stroke="currentColor" stroke-width="1.2"/></svg><span data-explode-label data-i18n="gallery.explode">Unfold structure</span></button>
+        </div>
+        <button id="btn-gallery-catalog" type="button" class="text-link"><span data-i18n="gallery.explore">Explore the collection</span><span aria-hidden="true">↗</span></button>
+      </main>
+      <div class="specimen-caption">
+        <div class="specimen-meta"><span data-i18n="gallery.specimen">CURRENT EXPLORATION</span><span id="artwork-index">01 / 04</span></div>
+        <h3 id="artwork-title">Continuum</h3><p id="artwork-description"></p>
+        <div class="specimen-bottom"><span id="artwork-category">Geometry</span><div class="specimen-pagination"><button id="btn-gallery-prev" type="button" data-i18n-aria="gallery.prev" aria-label="Previous specimen">←</button><button id="btn-gallery-next" type="button" data-i18n-aria="gallery.next" aria-label="Next specimen">→</button></div></div>
+      </div>
+
+      <div class="stage-heading" aria-hidden="true"><span>FIG. <span class="figure-number">001</span></span><span>CELLULAR FORM / LIVE SCULPTURE</span><span class="stage-cross">+</span></div>
+      <div class="stage-footer"><button id="btn-focus" type="button" class="focus-button" data-i18n-title="btn.focus" data-i18n-aria="btn.focus" title="Focus artwork" aria-label="Focus artwork">⌖</button><div class="gesture-hint"><span class="gesture-icon" aria-hidden="true">↔</span><span data-i18n="gallery.rotate">Drag to rotate</span><span class="hint-separator">/</span><span data-i18n="gallery.zoom">Scroll to explore</span></div><button type="button" id="btn-gallery-immersive" class="exhibition-button"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 7V3h4m6 0h4v4M3 13v4h4m6 0h4v-4" stroke="currentColor"/></svg><span data-i18n="gallery.immersive">Enter exhibition</span></button></div>
 
       <div class="transport-bar" aria-label="Playback controls">
         <button type="button" id="btn-play" class="primary" title="Space" data-i18n="btn.play">Play</button>
@@ -55,19 +85,24 @@
         <span id="universe-hint-text" data-i18n="universe.hintRoot">Double-click a living voxel to enter it</span>
       </div>
 
-      <aside class="panel" id="panel">
-        <div class="panel-heading"><strong data-i18n="panel.title">Studio controls</strong><button id="btn-panel-close" type="button" data-i18n-aria="panel.close" aria-label="Close panel">×</button></div>
+        <section class="specimen-data" aria-label="Live simulation data">
+          <div class="data-heading"><h2 data-i18n="gallery.evolution">Evolution</h2><span id="gallery-status" class="state-pill">Paused</span></div>
+          <div class="data-grid"><div><strong id="gallery-generation">0000</strong><span data-i18n="stat.gen">Generation</span></div><div><strong id="gallery-population">0</strong><span data-i18n="gallery.cells">Living cells</span></div></div>
+          <div class="density-label"><span data-i18n="gallery.fill">World occupancy</span><span id="gallery-density">0%</span></div><div class="density-track"><div id="gallery-progress"></div></div>
+          <div class="rule-label"><span data-i18n="stat.rule">Rule</span><span id="gallery-rule">B4/S4–5</span></div>
+        </section>
+
+      <aside class="panel collapsed" id="panel">
+        <div class="panel-heading"><div><span class="eyebrow" data-i18n="gallery.inspector">Field notes</span><strong data-i18n="panel.title">Studio controls</strong></div><button id="btn-panel-close" type="button" data-i18n-aria="panel.close" aria-label="Close panel">×</button></div>
         <div class="tabs" role="tablist" aria-label="Tasks">
           <button class="tab active" role="tab" tabindex="0" data-tab="watch" aria-selected="true" data-i18n="tab.watch">Watch</button>
           <button class="tab" role="tab" tabindex="-1" data-tab="create" aria-selected="false" data-i18n="tab.create">Create</button>
           <button class="tab" role="tab" tabindex="-1" data-tab="experiment" aria-selected="false" data-i18n="tab.experiment">Experiment</button>
         </div>
 
+
         <section class="tab-content featured" data-tab="watch">
-          <h2 data-i18n="section.featured">Featured scenes</h2>
-          <p class="hint-text" data-i18n="featured.help">Choose a setup, then press Play. This replaces the current world and can be undone.</p>
-          <div id="featured-scenes" class="featured-scenes"></div>
-          <div class="studio-actions"><button id="btn-open-catalog" class="primary" type="button" data-i18n="btn.catalog">Browse shape catalog</button><button id="btn-focus" type="button" data-i18n="btn.focus">Focus artwork</button></div>
+          <div class="studio-actions"><button id="btn-open-catalog" class="primary" type="button" data-i18n="btn.catalog">Browse shape catalog</button></div>
         </section>
 
         <section class="tab-content universe-panel" data-tab="watch">
@@ -230,20 +265,26 @@
         </section>
       </aside>
 
-      <button type="button" id="btn-panel" class="fab" data-i18n-title="btn.panelTitle" title="Toggle panel">☰</button>
+      <section class="collection-strip" aria-labelledby="collection-title">
+        <div class="collection-heading"><div><span class="eyebrow" id="collection-title" data-i18n="gallery.collection">THE LIVING COLLECTION</span><p data-i18n="gallery.collectionHint">Four beginnings. Infinite possibilities.</p></div><button type="button" id="btn-collection-catalog" class="collection-count"><span data-i18n="gallery.explore">Explore collection</span><span aria-hidden="true">↗</span></button></div>
+        <div id="featured-scenes" class="featured-scenes"></div>
+      </section>
+      <footer class="statusbar"><span><i class="status-dot"></i><span data-i18n="gallery.system">ALL SYSTEMS ALIVE</span></span><span>VOXEL GENESIS <span class="status-slash">/</span> EST. 2026</span><span>DESIGNED BY RULES. DEFINED BY YOU.</span></footer>
+
+      <button type="button" id="btn-panel" class="fab" data-i18n-title="btn.panelTitle" title="Toggle panel" data-i18n-aria="btn.panelTitle"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14M7 3v4m6 1v4m-6 1v4" stroke="currentColor" stroke-width="1.3"/></svg></button>
       <button type="button" id="btn-mode-fab" class="fab fab-mode" data-i18n-title="mode.fabOrbit" title="Orbit mode (tap for Paint)">🕹</button>
       <button type="button" id="btn-exit-immersive" class="exit-immersive" data-i18n="btn.exitImmersive">Exit immersive</button>
 
-      <div id="toast" class="toast hidden"></div>
+      <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-      <dialog id="catalog-dialog" class="workspace-dialog">
+      <dialog id="catalog-dialog" class="workspace-dialog" aria-label="Shape collection" data-i18n-aria="catalog.title">
         <header><div><h2 data-i18n="catalog.title">Shape catalog</h2><p data-i18n="catalog.help">Choose a real cell structure. Replacing the current shape can be undone.</p></div><button type="button" data-dialog-close aria-label="Close dialog" data-i18n-aria="dialog.close">×</button></header>
         <div class="catalog-tools"><input id="catalog-search" type="search" data-i18n-placeholder="catalog.search" placeholder="Search shapes" /><div id="catalog-filters" class="filter-row"><button data-category="all" class="active" data-i18n="category.all">All</button><button data-category="geometry" data-i18n="category.geometry">Geometry</button><button data-category="surface" data-i18n="category.surface">Surfaces</button><button data-category="fractal" data-i18n="category.fractal">Fractals</button><button data-category="organic" data-i18n="category.organic">Organic</button></div></div>
         <div id="catalog-grid" class="catalog-grid"></div>
         <p id="catalog-empty" class="catalog-empty hidden" data-i18n="catalog.empty">No matching shapes.</p>
       </dialog>
 
-      <dialog id="breeding-dialog" class="workspace-dialog breeding-dialog">
+      <dialog id="breeding-dialog" class="workspace-dialog breeding-dialog" aria-label="Shape breeding" data-i18n-aria="breeding.title">
         <header><div><h2 data-i18n="breeding.title">Shape breeding</h2><p data-i18n="breeding.help">Variants of the current shape. The 24-step preview excludes manual interventions; choosing one clears interventions and can be undone. Continued growth is not guaranteed.</p></div><button type="button" data-dialog-close aria-label="Close dialog" data-i18n-aria="dialog.close">×</button></header>
         <div class="breeding-status"><span id="breeding-progress" role="status"></span><button id="btn-cancel-breeding" type="button" data-i18n="btn.returnArtwork">Return to artwork</button></div>
         <div id="breeding-grid" class="catalog-grid breeding-grid"></div>

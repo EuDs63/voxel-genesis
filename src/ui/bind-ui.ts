@@ -186,6 +186,7 @@ export function bindAppUI(app: AppHost): void {
     $('btn-exit-immersive').onclick = () => app.toggleImmersive(false);
     $('btn-image').onclick = () => app.saveImage();
     $('btn-open-catalog').onclick = () => app.openCatalog();
+    document.getElementById('btn-collection-catalog')?.addEventListener('click', () => app.openCatalog());
     $('btn-open-catalog-create').onclick = () => app.openCatalog();
     $('btn-focus').onclick = () => app.focusArtwork();
     $('btn-universe-ascend').onclick = () => app.ascendUniverse();

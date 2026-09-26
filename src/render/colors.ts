@@ -12,7 +12,8 @@ export interface ColorPalette {
 }
 
 export const COLOR_PALETTES: Readonly<Record<ColorPaletteId, ColorPalette>> = {
-  ember: { young: 0xff4b1f, mature: 0xffb14a, ancient: 0x48dcff, trail: 0x778cff },
+  // Keep the original IDs so saved works and shared links remain compatible.
+  ember: { young: 0x1762bc, mature: 0x87c8ed, ancient: 0xd8e8f2, trail: 0x7eadd7 },
   glacier: { young: 0x5b9dff, mature: 0x61f4ef, ancient: 0xe3fbff, trail: 0x668de8 },
   orchid: { young: 0xff4f9a, mature: 0xb77aff, ancient: 0x66e8ff, trail: 0x9a70db },
 };
@@ -45,7 +46,7 @@ export function ageToColor(age: number, out: THREE.Color = _c): THREE.Color {
     _to.setHex(palette.ancient);
     out.lerpColors(_from, _to, (s - split) / (1 - split));
   }
-  if (age <= 2) out.multiplyScalar(age === 1 ? 1.12 : 1.05);
+  if (age <= 2) out.multiplyScalar(age === 1 ? 1.04 : 1.02);
   return out;
 }
 

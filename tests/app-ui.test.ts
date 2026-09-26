@@ -36,6 +36,24 @@ describe('immersive view', () => {
     app.toggleImmersive(false);
     expect(document.body.classList.contains('immersive')).toBe(false); expect(app.interactionMode).toBe('paint'); expect(slice.visible).toBe(false); expect(scene.helpersVisible).toBe(true);
   });
+
+  it('keeps hidden crystal bounds and intervention marks hidden after leaving the exhibition', () => {
+    document.body.innerHTML = '<aside id="panel" class="collapsed"></aside>';
+    const app = Object.create(App.prototype) as App;
+    const scene = { helpersVisible: false, setHelpersVisible: vi.fn((visible: boolean) => { scene.helpersVisible = visible; }) };
+    const interventions = { group: { visible: false } };
+    Object.assign(app, {
+      interactionMode: 'orbit', paintSliceVisible: false, scene, interventionRenderer: interventions,
+      slice: { setVisible: vi.fn() }, setInteractionMode: vi.fn(),
+    });
+    app.toggleImmersive(true);
+    app.toggleImmersive(true);
+    app.toggleImmersive(false);
+    expect(scene.helpersVisible).toBe(false);
+    expect(interventions.group.visible).toBe(false);
+    expect(document.getElementById('panel')?.classList.contains('collapsed')).toBe(true);
+    expect(document.body.classList.contains('immersive')).toBe(false);
+  });
 });
 
 describe('trend empty state', () => {

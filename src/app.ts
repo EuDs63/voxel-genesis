@@ -9,7 +9,7 @@ import {
   ruleFromPreset,
   type Rule,
 } from './sim/rules';
-import { SEEDS, SEED_CATALOG, DEFAULT_SEED_ID, applySeed, getSeedById } from './sim/seeds';
+import { SEEDS, SEED_CATALOG, applySeed, getSeedById } from './sim/seeds';
 import {
   SYMMETRY_OPTIONS,
   expandSymmetry,
@@ -46,7 +46,8 @@ import type { AppHost } from './ui/app-host';
 import { History } from './state/history';
 import { loadSession, saveSession, loadLibrary, upsertWork, writeLibrary, type SavedWork } from './state/library';
 import { PopulationTrend } from './ui/trend';
-import { FEATURED_SCENES, drawSeedPreview, drawGridPreview, type FeaturedScene } from './ui/featured-scenes';
+import { DEFAULT_FEATURED_SCENE, FEATURED_SCENES, getFeaturedRule, drawSeedPreview, drawGridPreview, type FeaturedScene } from './ui/featured-scenes';
+import { Gallery } from './ui/gallery';
 import { COLOR_PALETTES, setColorPalette, type ColorPaletteId } from './render/colors';
 import { Interventions, validateInterventionIndices, type InterventionKind } from './sim/interventions';
 import { InterventionRenderer } from './render/interventions';
@@ -92,10 +93,11 @@ export class App {
   public boundary: BoundaryMode = 'clamp';
   public generation = 0;
   public playing = false;
+  public exploded = false;
   public speed = 8;
   public density = 0.08;
-  public seedName = 'Genesis Spark';
-  public seedId = DEFAULT_SEED_ID;
+  public seedName = getSeedById(DEFAULT_FEATURED_SCENE.seedId)?.name ?? DEFAULT_FEATURED_SCENE.seedId;
+  public seedId = DEFAULT_FEATURED_SCENE.seedId;
   public accum = 0;
   public raycaster = new THREE.Raycaster();
   public pointer = new THREE.Vector2();
@@ -112,11 +114,18 @@ export class App {
   public history = new History<AppSnapshot>(24);
   public initialSnapshot!: AppSnapshot;
   private persistTimer = 0;
+  private gallery?: Gallery;
   public palette: ColorPaletteId = 'ember';
   public trend = new PopulationTrend(120);
   public lastStep: StepResult | null = null;
   private paintSliceVisible = true;
-  private immersiveState: { panelCollapsed: boolean; mode: InteractionMode; sliceVisible: boolean } | null = null;
+  private immersiveState: {
+    panelCollapsed: boolean;
+    mode: InteractionMode;
+    sliceVisible: boolean;
+    helpersVisible: boolean;
+    interventionsVisible: boolean;
+  } | null = null;
   public interventions: Interventions;
   public interventionRenderer: InterventionRenderer;
   public environment: EnvironmentId = 'aurora';
@@ -131,21 +140,22 @@ export class App {
     initLocale();
     this.reducedMotion = prefersReducedMotion();
     this.scene = new GenesisScene(canvas, { reducedMotion: this.reducedMotion });
-    this.grid = new Grid3D(24);
-    this.scratch = new Grid3D(24);
+    const initialSize = DEFAULT_FEATURED_SCENE.size ?? 24;
+    this.grid = new Grid3D(initialSize);
+    this.scratch = new Grid3D(initialSize);
     this.rule = getDefaultRule();
-    this.voxels = new VoxelRenderer(24 * 24 * 24);
+    this.voxels = new VoxelRenderer(initialSize ** 3);
     this.trails = new TrailRenderer(5, 30000);
     this.slice = new SlicePlane();
-    this.interventions = new Interventions(24);
-    this.interventionRenderer = new InterventionRenderer(24 ** 3);
-    this.slice.setGridSize(24);
-    this.slice.setIndex(12);
+    this.interventions = new Interventions(initialSize);
+    this.interventionRenderer = new InterventionRenderer(initialSize ** 3);
+    this.slice.setGridSize(initialSize);
+    this.slice.setIndex(Math.floor(initialSize / 2));
     this.scene.root.add(this.voxels.mesh);
     this.scene.root.add(this.trails.mesh);
     this.scene.root.add(this.slice.group);
     this.scene.root.add(this.interventionRenderer.group);
-    this.scene.updateBounds(24);
+    this.scene.updateBounds(initialSize);
     if (this.reducedMotion) {
       this.trails.setEnabled(false);
       this.trailsEnabled = false;
@@ -155,9 +165,11 @@ export class App {
     if (window.matchMedia('(pointer: coarse)').matches) {
       this.interactionMode = 'orbit';
     }
+    document.getElementById('panel')?.classList.add('collapsed');
     this.bindUI();
+    document.getElementById('btn-bloom')?.classList.remove('on');
+    this.gallery = new Gallery(this);
     this.bindInput(canvas);
-    if (window.innerWidth <= 720) document.getElementById('panel')?.classList.add('collapsed');
     window.addEventListener('pagehide', () => this.persistNow());
     const restored = this.tryLoadHash() || this.tryLoadSession();
     if (!restored) this.plantDefault();
@@ -166,7 +178,10 @@ export class App {
     this.syncUI();
     this.applyInteractionMode();
     this.voxels.sync(this.grid);
-    if (!restored) this.scene.frameContent(this.grid);
+    if (!restored) {
+      this.scene.frameContent(this.grid, DEFAULT_FEATURED_SCENE.camera);
+      this.syncCameraControls(DEFAULT_FEATURED_SCENE.camera);
+    }
     this.resetTrend();
     this.renderFeaturedScenes();
     if (restored) document.getElementById('first-hint')?.classList.add('hidden');
@@ -212,7 +227,7 @@ export class App {
     if (prevSeed && [...seedSel.options].some((o) => o.value === prevSeed)) {
       seedSel.value = prevSeed;
     } else {
-      seedSel.value = DEFAULT_SEED_ID;
+      seedSel.value = DEFAULT_FEATURED_SCENE.seedId;
     }
     const symSel = document.getElementById('symmetry') as HTMLSelectElement;
     const prevSym = symSel.value;
@@ -243,6 +258,8 @@ export class App {
     this.fillPresetSelects();
     const play = document.getElementById('btn-play');
     if (play) play.textContent = this.playing ? t('btn.pause') : t('btn.play');
+    const playState = document.getElementById('play-state');
+    if (playState) playState.textContent = t(this.playing ? 'state.running' : 'state.paused');
     const sliceBtn = document.getElementById('btn-slice-toggle');
     if (sliceBtn) sliceBtn.textContent = this.slice.visible ? t('btn.hide') : t('btn.show');
     this.updateRuleDesc();
@@ -253,7 +270,7 @@ export class App {
     this.refreshLibrary();
     this.renderFeaturedScenes();
     this.renderTrend();
-    this.setPalette(this.palette, false);
+    this.syncAppearanceControls();
     this.syncUniverseUI();
   }
   public updateRuleDesc(): void {
@@ -273,11 +290,13 @@ export class App {
     el.textContent = s ? t(seedDescKey(s.id)) : '';
   }
   private plantDefault(): void {
-    applySeed(this.grid, DEFAULT_SEED_ID);
-    this.seedId = DEFAULT_SEED_ID;
-    this.seedName = getSeedById(DEFAULT_SEED_ID)!.name;
+    const feature = DEFAULT_FEATURED_SCENE;
+    applySeed(this.grid, feature.seedId);
+    this.seedId = feature.seedId;
+    this.seedName = getSeedById(feature.seedId)!.name;
     this.generation = 0;
-    this.rule = getDefaultRule();
+    this.rule = getFeaturedRule(feature);
+    this.speed = feature.speed;
   }
   private tryLoadHash(): boolean {
     const snap = readHash();
@@ -300,6 +319,7 @@ export class App {
   }
   public loadSnapshot(snap: AppSnapshot, record = true, preserveUniverse = false): void {
     this.finishUniverseTransition();
+    this.resetSpread();
     if (!preserveUniverse) this.resetUniverseNavigation();
     this.cancelBreeding(true);
     if (record && this.initialSnapshot) this.history.push(this.makeSnapshot());
@@ -336,6 +356,7 @@ export class App {
     this.scene.frameContent(this.grid);
   }
   private rebuildGrid(size: number): void {
+    this.resetSpread();
     this.grid = new Grid3D(size);
     this.scratch = new Grid3D(size);
     this.slice.setGridSize(size);
@@ -381,14 +402,19 @@ export class App {
   private bindUI(): void { bindAppUI(this as unknown as AppHost); }
   public goCamera(id: CameraPresetId): void {
     if (!this.scene.applyCameraPreset(id)) return;
+    this.syncCameraControls(id);
+    this.toast(t(cameraKey(id)));
+  }
+  private syncCameraControls(id: CameraPresetId): void {
+    if (typeof document === 'undefined') return;
     document.querySelectorAll('.cam-preset').forEach((b) => {
       b.classList.toggle('active', (b as HTMLElement).dataset.preset === id);
     });
     const on = this.scene.autoOrbit;
     document.getElementById('btn-orbit')?.classList.toggle('on', on);
-    this.toast(t(cameraKey(id)));
   }
   public setInteractionMode(mode: InteractionMode): void {
+    if (mode === 'paint') this.resetSpread();
     if (this.interactionMode === 'paint' && mode === 'orbit') this.paintSliceVisible = this.slice.visible;
     this.interactionMode = mode;
     this.applyInteractionMode();
@@ -526,6 +552,7 @@ export class App {
     direction: 'in' | 'out',
     focus: UniverseAddressStep,
   ): void {
+    this.resetSpread();
     const outgoing = this.voxels;
     const outgoingSize = this.grid.size;
     const applied = applySnapshot(memory.snapshot);
@@ -748,6 +775,7 @@ export class App {
     btn.textContent = this.playing ? t('btn.pause') : t('btn.play');
     const state = document.getElementById('play-state');
     if (state) { state.textContent = this.playing ? t('state.running') : t('state.paused'); state.classList.toggle('running', this.playing); }
+    this.gallery?.sync();
     if (!this.playing) this.persistNow();
   }
   public doStep(): StepResult {
@@ -776,15 +804,18 @@ export class App {
     this.toast(t('toast.restarted'));
   }
   public restoreDefaults(): void {
+    this.finishUniverseTransition(); this.resetUniverseNavigation(); this.cancelBreeding(true);
+    this.resetSpread();
     this.history.push(this.makeSnapshot());
-    if (this.grid.size !== 24) this.rebuildGrid(24);
+    const size = DEFAULT_FEATURED_SCENE.size ?? 24;
+    if (this.grid.size !== size) this.rebuildGrid(size);
     this.density = 0.08;
     this.speed = 8;
     this.boundary = 'clamp';
     this.symmetry = 'none';
     this.brushRadius = 0;
     this.slice.setAxis('y');
-    this.slice.setIndex(12);
+    this.slice.setIndex(Math.floor(size / 2));
     this.paintSliceVisible = true;
     this.slice.setVisible(this.interactionMode === 'paint');
     this.plantDefault();
@@ -794,22 +825,28 @@ export class App {
     this.voxels.sync(this.grid);
     this.syncUI();
     this.resetTrend();
+    this.scene.frameContent(this.grid, DEFAULT_FEATURED_SCENE.camera);
+    this.syncCameraControls(DEFAULT_FEATURED_SCENE.camera);
     this.schedulePersist();
   }
   public plantSeed(id: string): void {
+    const seed = getSeedById(id); if (!seed) return;
+    this.finishUniverseTransition(); this.resetUniverseNavigation();
+    this.resetSpread();
     this.cancelBreeding(true);
     this.togglePlay(false);
     if (this.initialSnapshot) this.history.push(this.makeSnapshot());
     if (!applySeed(this.grid, id)) return;
     this.interventions.clear(); this.interventionRenderer.sync(this.interventions);
     this.seedId = id;
-    this.seedName = getSeedById(id)!.name;
+    this.seedName = seed.name;
     this.generation = 0;
     this.trails.clear();
     this.voxels.sync(this.grid);
     this.syncUI();
     this.resetTrend();
     this.initialSnapshot = this.makeSnapshot(false);
+    this.scene.frameContent(this.grid);
     this.schedulePersist();
     this.toast(t(seedNameKey(id)));
   }
@@ -906,6 +943,7 @@ export class App {
     this.applyInteractionMode();
     const state = document.getElementById('play-state');
     if (state) { state.textContent = this.playing ? t('state.running') : t('state.paused'); state.classList.toggle('running', this.playing); }
+    this.syncAppearanceControls();
     this.syncUniverseUI();
   }
   public syncStats(): void {
@@ -913,6 +951,7 @@ export class App {
     document.getElementById('stat-pop')!.textContent = String(this.grid.population);
     document.getElementById('stat-rule')!.textContent = this.rule.notation;
     document.getElementById('stat-seed')!.textContent = this.displaySeedName();
+    this.gallery?.sync();
   }
   public showFirstHint(): void {
     try {
@@ -985,10 +1024,23 @@ export class App {
   }
   public setEnvironment(id: EnvironmentId): void {
     this.environment = id; this.scene.setEnvironment(id);
-    document.querySelectorAll<HTMLElement>('[data-environment]').forEach((el) => el.classList.toggle('active', el.dataset.environment === id));
+    this.syncAppearanceControls();
     this.schedulePersist();
   }
   public focusArtwork(): void { this.scene.frameContent(this.grid); }
+  public toggleExploded(): void {
+    if (this.universeTransition) return;
+    if (this.interactionMode === 'paint') this.setInteractionMode('orbit');
+    this.exploded = !this.exploded;
+    this.voxels.setSpread(this.exploded ? 1.18 : 1, this.reducedMotion);
+    this.gallery?.sync();
+  }
+  private resetSpread(): void {
+    if (!this.exploded) return;
+    this.exploded = false;
+    this.voxels.setSpread(1, true);
+    this.gallery?.sync();
+  }
   public renderCatalog(): void {
     const host = document.getElementById('catalog-grid'); if (!host) return; host.innerHTML = '';
     for (const seed of SEED_CATALOG) {
@@ -1048,49 +1100,72 @@ export class App {
   }
   public setPalette(id: ColorPaletteId, persist = true): void {
     this.palette = id; setColorPalette(id); this.voxels.sync(this.grid); this.trails.clear();
+    this.syncAppearanceControls();
+    if (persist) this.schedulePersist();
+  }
+  private syncAppearanceControls(): void {
     if (typeof document !== 'undefined') {
-      document.querySelectorAll<HTMLElement>('[data-palette]').forEach((el) => el.classList.toggle('active', el.dataset.palette === id));
-      document.body.dataset.palette = id;
-      const colors = COLOR_PALETTES[id];
+      document.querySelectorAll<HTMLElement>('[data-palette]').forEach((el) => {
+        const selected = el.dataset.palette === this.palette;
+        el.classList.toggle('active', selected); el.setAttribute('aria-pressed', String(selected));
+      });
+      document.querySelectorAll<HTMLElement>('[data-environment]').forEach((el) => {
+        const selected = el.dataset.environment === this.environment;
+        el.classList.toggle('active', selected); el.setAttribute('aria-pressed', String(selected));
+      });
+      document.body.dataset.palette = this.palette;
+      const colors = COLOR_PALETTES[this.palette];
       const cssHex = (value: number) => `#${value.toString(16).padStart(6, '0')}`;
       document.body.style.setProperty('--palette-young', cssHex(colors.young));
       document.body.style.setProperty('--palette-mature', cssHex(colors.mature));
       document.body.style.setProperty('--palette-ancient', cssHex(colors.ancient));
     }
-    if (persist) this.schedulePersist();
   }
   public applyFeatured(feature: FeaturedScene): void {
-    const preset = getPresetById(feature.ruleId); if (!preset) return;
+    if (!getPresetById(feature.ruleId)) return;
+    this.finishUniverseTransition(); this.resetUniverseNavigation(); this.cancelBreeding(true);
+    this.resetSpread();
     this.history.push(this.makeSnapshot());
-    if (this.grid.size !== 24) this.rebuildGrid(24);
+    const size = feature.size ?? 24;
+    if (this.grid.size !== size) this.rebuildGrid(size);
     this.boundary = 'clamp';
-    applySeed(this.grid, feature.seedId); this.rule = ruleFromPreset(preset);
+    applySeed(this.grid, feature.seedId); this.rule = getFeaturedRule(feature);
     this.interventions.clear(); this.interventionRenderer.sync(this.interventions);
     this.seedId = feature.seedId; this.seedName = getSeedById(feature.seedId)?.name ?? feature.seedId;
     this.speed = feature.speed; this.generation = 0; this.playing = false; this.setInteractionMode('orbit');
     this.initialSnapshot = this.makeSnapshot(false); this.trails.clear(); this.voxels.sync(this.grid);
-    this.goCamera(feature.camera); this.syncUI(); this.resetTrend(); this.schedulePersist();
+    this.scene.frameContent(this.grid, feature.camera); this.syncCameraControls(feature.camera); this.syncUI(); this.resetTrend(); this.schedulePersist();
   }
   public renderFeaturedScenes(): void {
     const host = document.getElementById('featured-scenes'); if (!host) return; host.innerHTML = '';
     for (const feature of FEATURED_SCENES) {
       const button = document.createElement('button'); button.className = 'scene-card'; button.type = 'button';
-      const canvas = document.createElement('canvas'); canvas.width = 150; canvas.height = 82; canvas.setAttribute('aria-hidden', 'true');
+      button.dataset.gallerySeed = feature.seedId;
+      button.setAttribute('aria-pressed', String(this.seedId === feature.seedId));
+      button.classList.toggle('active', this.seedId === feature.seedId);
+      const canvas = document.createElement('canvas'); canvas.width = 240; canvas.height = 140; canvas.setAttribute('aria-hidden', 'true');
       const copy = document.createElement('span'); const title = document.createElement('strong'); title.textContent = t(feature.nameKey);
       const hint = document.createElement('small'); hint.textContent = t(feature.hintKey); copy.append(title, hint);
-      button.append(canvas, copy); button.onclick = () => this.applyFeatured(feature); host.append(button); drawSeedPreview(canvas, feature.seedId);
+      const number = document.createElement('span'); number.className = 'scene-number'; number.textContent = String(FEATURED_SCENES.indexOf(feature) + 1).padStart(2, '0');
+      button.append(canvas, copy, number); button.onclick = () => this.applyFeatured(feature); host.append(button); drawSeedPreview(canvas, feature.seedId);
     }
   }
   public toggleImmersive(force?: boolean): void {
     const entering = force ?? !document.body.classList.contains('immersive');
     if (entering && !this.immersiveState) {
-      this.immersiveState = { panelCollapsed: document.getElementById('panel')!.classList.contains('collapsed'), mode: this.interactionMode, sliceVisible: this.paintSliceVisible };
+      this.immersiveState = {
+        panelCollapsed: document.getElementById('panel')!.classList.contains('collapsed'),
+        mode: this.interactionMode,
+        sliceVisible: this.paintSliceVisible,
+        helpersVisible: this.scene.helpersVisible,
+        interventionsVisible: this.interventionRenderer.group.visible,
+      };
       document.body.classList.add('immersive'); this.setInteractionMode('orbit'); this.slice.setVisible(false); this.scene.setHelpersVisible(false);
       this.interventionRenderer.group.visible = false;
     } else if (!entering && this.immersiveState) {
       const state = this.immersiveState; this.immersiveState = null; document.body.classList.remove('immersive');
-      document.getElementById('panel')!.classList.toggle('collapsed', state.panelCollapsed); this.scene.setHelpersVisible(true); this.paintSliceVisible = state.sliceVisible; this.setInteractionMode(state.mode);
-      this.interventionRenderer.group.visible = true;
+      document.getElementById('panel')!.classList.toggle('collapsed', state.panelCollapsed); this.scene.setHelpersVisible(state.helpersVisible); this.paintSliceVisible = state.sliceVisible; this.setInteractionMode(state.mode);
+      this.interventionRenderer.group.visible = state.interventionsVisible;
     }
   }
   public saveImage(): void {

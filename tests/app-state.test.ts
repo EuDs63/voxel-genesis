@@ -4,8 +4,10 @@ import { encodeCells, type AppSnapshot } from '../src/sim/share';
 import { getDefaultRule } from '../src/sim/rules';
 import { History } from '../src/state/history';
 import { PopulationTrend } from '../src/ui/trend';
-import { FEATURED_SCENES } from '../src/ui/featured-scenes';
+import { DEFAULT_FEATURED_SCENE, FEATURED_SCENES } from '../src/ui/featured-scenes';
 import { Interventions } from '../src/sim/interventions';
+import { Group, PerspectiveCamera, Vector3 } from 'three';
+import { VoxelRenderer } from '../src/render/voxels';
 
 function appHarness(size = 12): App {
   const app = Object.create(App.prototype) as App;
@@ -67,8 +69,86 @@ describe('App experiment restoration', () => {
   it('applies a featured setup as one undoable edit', () => {
     const app = appHarness(); const before = encodeCells(app.grid);
     app.applyFeatured(FEATURED_SCENES[1]!);
-    expect(app.seedId).toBe('spiral-helix'); expect(app.playing).toBe(false); expect(app.grid.size).toBe(24); expect(app.boundary).toBe('clamp'); expect(app.interactionMode).toBe('orbit');
+    expect(app.seedId).toBe(FEATURED_SCENES[1]!.seedId); expect(app.playing).toBe(false); expect(app.grid.size).toBe(24); expect(app.boundary).toBe('clamp'); expect(app.interactionMode).toBe('orbit');
     app.undo();
     expect(encodeCells(app.grid)).toBe(before);
+  });
+
+  it('restores the featured resolution with undo, redo, and restart', () => {
+    const app = appHarness(18);
+    app.grid.set(4, 5, 6, 2);
+    const original = encodeCells(app.grid);
+    app.applyFeatured(DEFAULT_FEATURED_SCENE);
+    const sculpture = encodeCells(app.grid);
+    expect(app.grid.size).toBe(DEFAULT_FEATURED_SCENE.size);
+    expect(app.scratch.size).toBe(DEFAULT_FEATURED_SCENE.size);
+    expect(app.initialSnapshot.size).toBe(DEFAULT_FEATURED_SCENE.size);
+    expect(app.grid.population).toBeGreaterThan(0);
+    app.undo();
+    expect(app.grid.size).toBe(18);
+    expect(encodeCells(app.grid)).toBe(original);
+    app.redo();
+    expect(app.grid.size).toBe(DEFAULT_FEATURED_SCENE.size);
+    expect(encodeCells(app.grid)).toBe(sculpture);
+    app.doStep();
+    app.reset();
+    expect(encodeCells(app.grid)).toBe(sculpture);
+    expect(app.generation).toBe(0);
+  });
+
+  it('preserves an empty saved world rather than replacing it with a featured sculpture', () => {
+    const app = appHarness();
+    const empty = app.makeSnapshot(false);
+    app.applyFeatured(DEFAULT_FEATURED_SCENE);
+    app.loadSnapshot(empty, false);
+    expect(app.grid.population).toBe(0);
+    expect(app.grid.size).toBe(empty.size);
+    expect(app.seedId).toBe('');
+  });
+
+  it('explodes only the presentation and assembles when another work is loaded', () => {
+    const app = appHarness();
+    const spread = vi.fn();
+    Object.assign(app.voxels, { setSpread: spread });
+    app.reducedMotion = true;
+    const recordEdit = vi.spyOn(app.history, 'push');
+    const original = app.makeSnapshot();
+    app.toggleExploded();
+    expect(app.exploded).toBe(true);
+    expect(spread).toHaveBeenLastCalledWith(1.18, true);
+    expect(app.makeSnapshot()).toEqual(original);
+    expect(recordEdit).not.toHaveBeenCalled();
+    app.applyFeatured(DEFAULT_FEATURED_SCENE);
+    expect(app.exploded).toBe(false);
+    expect(spread).toHaveBeenLastCalledWith(1, true);
+  });
+
+  it('returns to the parent sculpture and preserves edits when revisiting a child universe', () => {
+    const app = appHarness();
+    Object.assign(app, {
+      reducedMotion: true, universeSeed: null, universePath: [], universeAncestors: [], universeCache: new Map(),
+      voxels: new VoxelRenderer(app.grid.size ** 3),
+      applyInteractionMode: vi.fn(),
+      togglePlay: vi.fn((playing: boolean) => { app.playing = playing; }),
+    });
+    Object.assign(app.scene, {
+      root: new Group(), camera: new PerspectiveCamera(), updateBounds: vi.fn(),
+      controls: { target: new Vector3(), update: vi.fn() },
+    });
+    Object.assign(app.interventionRenderer, { group: new Group() });
+    app.grid.set(2, 3, 4, 6);
+    app.voxels.sync(app.grid);
+    const parentCells = encodeCells(app.grid);
+    expect(app.diveIntoCell(2, 3, 4)).toBe(true);
+    expect(app.universeDepth).toBe(1);
+    app.grid.set(0, 0, 0, 7);
+    const editedChild = encodeCells(app.grid);
+    expect(app.ascendUniverse()).toBe(true);
+    expect(app.universeDepth).toBe(0);
+    expect(encodeCells(app.grid)).toBe(parentCells);
+    expect(app.diveIntoCell(2, 3, 4)).toBe(true);
+    expect(encodeCells(app.grid)).toBe(editedChild);
+    app.voxels.dispose();
+    app.interventionRenderer.dispose();
   });
 });

@@ -5,11 +5,11 @@ export function bindAppInput(app: AppHost, canvas: HTMLCanvasElement): void {
     let lastTouchTap: { x: number; y: number; at: number } | null = null;
     let suppressDblClickUntil = 0;
     window.addEventListener('keydown', (e) => {
+      if (e.defaultPrevented) return;
       if (document.querySelector('dialog[open]')) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.target instanceof HTMLSelectElement) return;
       const k = e.key.toLowerCase();
       if (k === 'escape') { app.toggleImmersive(false); return; }
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, button, a[href], summary, [contenteditable]:not([contenteditable="false"])')) return;
       if ((e.ctrlKey || e.metaKey) && !e.altKey && k === 'z') {
         e.preventDefault();
         if (e.shiftKey) app.redo(); else app.undo();
@@ -144,5 +144,6 @@ export function runAppLoop(app: AppHost): void {
   }
   app.slice.update(dt);
   app.updateUniverseTransition(dt);
+  app.voxels.update(dt);
   app.scene.render();
 }

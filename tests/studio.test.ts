@@ -1,19 +1,19 @@
 import { Grid3D } from '../src/sim/grid';
 import { stepInPlace } from '../src/sim/ca';
 import { applySeed } from '../src/sim/seeds';
-import { getPresetById, ruleFromPreset } from '../src/sim/rules';
-import { FEATURED_SCENES } from '../src/ui/featured-scenes';
+import { FEATURED_SCENES, getFeaturedRule } from '../src/ui/featured-scenes';
 import { PopulationTrend } from '../src/ui/trend';
 
 describe('studio observations', () => {
   it('keeps each featured setup observable and behaviorally distinct for 20 steps', () => {
     const signatures = new Set<string>();
     for (const feature of FEATURED_SCENES) {
-      const grid = new Grid3D(24), scratch = new Grid3D(24); applySeed(grid, feature.seedId);
-      const preset = getPresetById(feature.ruleId)!; const rule = ruleFromPreset(preset); const populations = [grid.population];
+      const size = feature.size ?? 24;
+      const grid = new Grid3D(size), scratch = new Grid3D(size); applySeed(grid, feature.seedId);
+      const rule = getFeaturedRule(feature); const populations = [grid.population];
       for (let i = 0; i < 20; i++) { stepInPlace(grid, scratch, rule); populations.push(grid.population); }
       expect(populations[1], feature.id).toBeGreaterThan(0);
-      expect(populations.some((value, index) => index > 0 && value > 0)).toBe(true);
+      expect(populations.every((value) => value > 0), feature.id).toBe(true);
       signatures.add(populations.join(','));
     }
     expect(signatures.size).toBe(FEATURED_SCENES.length);

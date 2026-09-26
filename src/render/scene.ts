@@ -1,5 +1,5 @@
 /**
- * Three.js scene: dark void, fog, lights, bloom, orbit controls, camera presets.
+ * Gallery lighting, restrained bloom, orbit controls and responsive framing.
  */
 
 import * as THREE from 'three';
@@ -8,6 +8,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { EnvironmentRenderer, type EnvironmentId } from './environments';
 import {
   CameraDirector,
@@ -29,16 +30,20 @@ export class GenesisScene {
   private readonly environmentRenderer = new EnvironmentRenderer();
   private composer: EffectComposer | null = null;
   private bloomPass: UnrealBloomPass | null = null;
-  private readonly clock = new THREE.Clock();
+  private studioEnvironment: THREE.WebGLRenderTarget | null = null;
+  private keyLight: THREE.DirectionalLight | null = null;
+  private readonly clock = new THREE.Timer();
   private _dt = 1 / 60;
   autoOrbit = true;
   private reducedMotion: boolean;
   private boundsHelper: THREE.LineSegments | null = null;
-  private helpersShown = true;
+  private helpersShown = false;
   private gridSize = 24;
   private pendingOrbit: boolean | null = null;
+  private readonly resizeObserver: ResizeObserver | null;
 
   constructor(canvas: HTMLCanvasElement, opts: SceneOptions) {
+    this.clock.connect(document);
     this.reducedMotion = opts.reducedMotion;
     this.autoOrbit = !opts.reducedMotion;
     this.director.setReducedMotion(opts.reducedMotion);
@@ -50,17 +55,30 @@ export class GenesisScene {
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    const width = canvas.clientWidth || window.innerWidth;
+    const height = canvas.clientHeight || window.innerHeight;
+    this.renderer.setSize(width, height, false);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
+    this.renderer.toneMappingExposure = 0.94;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x111a34);
-    this.scene.fog = new THREE.FogExp2(0x0a1022, 0.012);
+    this.scene.background = new THREE.Color(0xf4f7fb);
+    this.scene.fog = new THREE.FogExp2(0xf4f7fb, 0.002);
+    // A generated studio is captured once, providing long softbox reflections
+    // on the beveled facets without downloading an HDR image or extra assets.
+    const studio = new RoomEnvironment();
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.studioEnvironment = pmrem.fromScene(studio, 0.025);
+    this.scene.environment = this.studioEnvironment.texture;
+    this.scene.environmentIntensity = 0.85;
+    studio.dispose();
+    pmrem.dispose();
 
-    this.camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 500);
-    this.camera.position.set(30, 20, 35);
+    this.camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 500);
+    this.camera.position.set(32, 22, 38);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
@@ -69,37 +87,36 @@ export class GenesisScene {
     this.controls.maxDistance = 120;
     this.controls.target.set(0, 0, 0);
     this.controls.autoRotate = this.autoOrbit;
-    this.controls.autoRotateSpeed = 0.55;
+    this.controls.autoRotateSpeed = 0.22;
 
-    const amb = new THREE.HemisphereLight(0xa9bad5, 0x100a10, 1.08);
-    const keySun = new THREE.DirectionalLight(0xffc3a0, 2.45);
-    keySun.position.set(18, 28, 24);
-    const faceFill = new THREE.DirectionalLight(0xdce8ff, 1.18);
-    faceFill.position.set(-16, 7, 20);
-    const key = new THREE.PointLight(0xff7138, 72, 120, 2);
-    key.position.set(20, 30, 15);
-    const fill = new THREE.PointLight(0x42d9ff, 48, 100, 2);
-    fill.position.set(-25, 10, -20);
-    const rim = new THREE.DirectionalLight(0x7188ff, 1.15);
-    rim.position.set(-10, -20, 30);
+    const amb = new THREE.HemisphereLight(0xedf6ff, 0x17417b, 0.16);
+    const keySun = new THREE.DirectionalLight(0xffffff, 1.65);
+    keySun.position.set(-18, 30, 24);
+    keySun.castShadow = true;
+    keySun.shadow.mapSize.set(1536, 1536);
+    keySun.shadow.normalBias = 0.08;
+    keySun.shadow.bias = -0.0002;
+    this.keyLight = keySun;
+    const faceFill = new THREE.DirectionalLight(0x86b6ff, 0.14);
+    faceFill.position.set(24, 6, 8);
+    const rim = new THREE.DirectionalLight(0xe1f7ff, 1.45);
+    rim.position.set(4, 14, -24);
 
-    this.scene.add(this.environmentRenderer.group, amb, keySun, faceFill, key, fill, rim, this.root);
-
-    if (!this.reducedMotion) {
-      this.setupBloom();
-    }
+    this.scene.add(this.environmentRenderer.group, amb, keySun, faceFill, rim, this.root);
 
     window.addEventListener('resize', this.onResize);
+    this.resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(this.onResize) : null;
+    this.resizeObserver?.observe(canvas);
   }
 
   private setupBloom(): void {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.48,
-      0.34,
-      0.82,
+      this.renderer.getSize(new THREE.Vector2()),
+      0.1,
+      0.25,
+      1.3,
     );
     this.composer.addPass(this.bloomPass);
     this.composer.addPass(new OutputPass());
@@ -112,6 +129,9 @@ export class GenesisScene {
   }
 
   private disposeComposer(): void {
+    // EffectComposer owns its targets, while each pass owns separate GPU
+    // resources (bloom alone has several render targets and shader materials).
+    for (const pass of this.composer?.passes ?? []) pass.dispose();
     this.composer?.dispose();
     this.composer = null;
     this.bloomPass = null;
@@ -148,16 +168,37 @@ export class GenesisScene {
   updateBounds(size: number): void {
     this.gridSize = size;
     this.environmentRenderer.updateBounds(size);
+    if (this.keyLight) {
+      this.keyLight.position.set(-size * 0.9, size * 1.5, size * 1.2);
+      const shadowCamera = this.keyLight.shadow.camera;
+      shadowCamera.left = shadowCamera.bottom = -size * 0.78;
+      shadowCamera.right = shadowCamera.top = size * 0.78;
+      shadowCamera.near = 0.5;
+      shadowCamera.far = size * 5;
+      shadowCamera.updateProjectionMatrix();
+    }
     if (this.boundsHelper) {
       this.root.remove(this.boundsHelper);
       this.boundsHelper.geometry.dispose();
       (this.boundsHelper.material as THREE.Material).dispose();
     }
-    const box = new THREE.BoxGeometry(size, size, size);
-    const edges = new THREE.EdgesGeometry(box);
+    // Short registration marks give scale without enclosing the artwork in a cage.
+    const points: number[] = [];
+    const half = size / 2;
+    const tick = Math.max(0.7, size * 0.055);
+    for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) {
+      const corner = [x * half, y * half, z * half];
+      for (let axis = 0; axis < 3; axis++) {
+        const end = [...corner];
+        end[axis] -= Math.sign(end[axis]!) * tick;
+        points.push(...corner, ...end);
+      }
+    }
+    const edges = new THREE.BufferGeometry();
+    edges.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
     this.boundsHelper = new THREE.LineSegments(
       edges,
-      new THREE.LineBasicMaterial({ color: 0x28364b, transparent: true, opacity: 0.28 }),
+      new THREE.LineBasicMaterial({ color: 0x859bb9, transparent: true, opacity: 0.15 }),
     );
     this.boundsHelper.visible = this.helpersShown;
     this.root.add(this.boundsHelper);
@@ -184,10 +225,13 @@ export class GenesisScene {
 
   setEnvironment(id: EnvironmentId): void {
     this.environmentRenderer.setEnvironment(id);
+    const backdrop = id === 'dawn' ? 0xf7f4f1 : id === 'blueprint' ? 0xecf2fa : 0xf4f7fb;
+    this.scene.background = new THREE.Color(backdrop);
+    this.scene.fog?.color.setHex(backdrop);
   }
 
-  /** Fit live cells into roughly 58% of the viewport, independent of grid size. */
-  frameContent(grid: { size: number; cells: ArrayLike<number> }): boolean {
+  /** Fit live cells prominently into the actual artwork viewport. */
+  frameContent(grid: { size: number; cells: ArrayLike<number> }, presetId?: CameraPresetId): boolean {
     const half = (grid.size - 1) / 2;
     const min = new THREE.Vector3(Infinity, Infinity, Infinity);
     const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
@@ -207,23 +251,42 @@ export class GenesisScene {
       min.setScalar(-fallback);
       max.setScalar(fallback);
     }
-    this.frameBounds(min, max);
+    const preset = presetId ? getCameraPreset(presetId) : undefined;
+    const direction = preset?.position(grid.size).sub(preset.target(grid.size));
+    if (preset) this.autoOrbit = !!preset.autoOrbit && !this.reducedMotion;
+    this.frameBounds(min, max, direction);
     return found;
   }
 
-  frameBounds(min: THREE.Vector3, max: THREE.Vector3): void {
+  frameBounds(min: THREE.Vector3, max: THREE.Vector3, preferredDirection?: THREE.Vector3): void {
     this.director.cancel();
     this.pendingOrbit = null;
     this.controls.autoRotate = this.autoOrbit;
     const center = min.clone().add(max).multiplyScalar(0.5);
     const radius = Math.max(0.9, min.distanceTo(max) * 0.5);
-    const verticalFov = THREE.MathUtils.degToRad(this.camera.fov);
-    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov * 0.5) * this.camera.aspect);
-    const limitingFov = Math.min(verticalFov, horizontalFov);
-    const distance = radius / (Math.tan(limitingFov * 0.5) * 0.58);
-    const direction = this.camera.position.clone().sub(this.controls.target);
+    const direction = preferredDirection?.clone() ?? this.camera.position.clone().sub(this.controls.target);
     if (direction.lengthSq() < 0.001) direction.set(1, 0.7, 1);
     direction.normalize();
+    // Fit the projected box rather than its bounding sphere: a thin ring
+    // deserves the same visual presence as a cube. Matrix4.lookAt supplies
+    // the camera's actual right/up basis, including its vertical-view fallback.
+    const viewBasis = new THREE.Matrix4().lookAt(direction, new THREE.Vector3(), this.camera.up);
+    const right = new THREE.Vector3().setFromMatrixColumn(viewBasis, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(viewBasis, 1);
+    const tanVertical = Math.tan(THREE.MathUtils.degToRad(this.camera.getEffectiveFOV()) * 0.5);
+    const tanHorizontal = tanVertical * this.camera.aspect;
+    const occupancy = 0.84;
+    const corner = new THREE.Vector3();
+    let distance = Math.max(1.8, radius * 1.05);
+    for (const x of [min.x, max.x]) for (const y of [min.y, max.y]) for (const z of [min.z, max.z]) {
+      corner.set(x, y, z).sub(center);
+      const depth = corner.dot(direction);
+      distance = Math.max(
+        distance,
+        Math.abs(corner.dot(right)) / (tanHorizontal * occupancy) + depth,
+        Math.abs(corner.dot(up)) / (tanVertical * occupancy) + depth,
+      );
+    }
     this.controls.target.copy(center);
     this.camera.position.copy(center).addScaledVector(direction, distance);
     this.controls.minDistance = Math.max(1.8, radius * 1.05);
@@ -237,6 +300,7 @@ export class GenesisScene {
 
   /** Advance the clock once per frame (call before render). */
   get delta(): number {
+    this.clock.update();
     this._dt = this.clock.getDelta();
     return this._dt;
   }
@@ -251,21 +315,27 @@ export class GenesisScene {
   }
 
   private onResize = (): void => {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const w = Math.max(1, this.renderer.domElement.clientWidth);
+    const h = Math.max(1, this.renderer.domElement.clientHeight);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h);
+    this.renderer.setSize(w, h, false);
     this.composer?.setSize(w, h);
     this.bloomPass?.resolution.set(w, h);
   };
 
   dispose(): void {
+    this.clock.dispose();
     window.removeEventListener('resize', this.onResize);
+    this.resizeObserver?.disconnect();
     this.controls.dispose();
     this.disposeComposer();
     this.environmentRenderer.dispose();
     this.environmentRenderer.group.clear();
+    this.scene.environment = null;
+    this.studioEnvironment?.dispose();
+    this.studioEnvironment = null;
+    this.keyLight?.shadow.dispose();
     this.scene.traverse((object) => {
       const mesh = object as THREE.Mesh;
       mesh.geometry?.dispose();
